@@ -244,22 +244,22 @@ function App() {
                         </button>
                     </div>
 
-                    <div style={{ background: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #e0e0e0', marginBottom: '20px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span style={{ color: '#666', fontSize: '0.9rem', fontWeight: 500 }}>Filtrar por:</span>
-                        <select style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', minWidth: '150px' }}><option>Todas as turmas</option></select>
-                        <select style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', minWidth: '150px' }}><option>Todas as UCs</option></select>
+                    <div style={{ background: 'var(--bg-primary)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 500 }}>Filtrar por:</span>
+                        <select style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}><option>Todas as turmas</option></select>
+                        <select style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}><option>Todas as UCs</option></select>
 
                         <div style={{ flex: 1 }}></div>
 
-                        <div style={{ display: 'flex', gap: '0', border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', gap: '0', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
                             <button
                                 onClick={() => setCalendarViewMode('grid')}
-                                style={{ padding: '8px 12px', background: calendarViewMode === 'grid' ? '#E3F2FD' : 'white', color: calendarViewMode === 'grid' ? '#004587' : '#666' }}>
+                                style={{ padding: '8px 12px', background: calendarViewMode === 'grid' ? 'var(--bg-secondary)' : 'var(--bg-primary)', color: calendarViewMode === 'grid' ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
                                 <LayoutGrid size={18} />
                             </button>
                             <button
                                 onClick={() => setCalendarViewMode('list')}
-                                style={{ padding: '8px 12px', background: calendarViewMode === 'list' ? '#E3F2FD' : 'white', color: calendarViewMode === 'list' ? '#004587' : '#666', borderLeft: '1px solid #ddd' }}>
+                                style={{ padding: '8px 12px', background: calendarViewMode === 'list' ? 'var(--bg-secondary)' : 'var(--bg-primary)', color: calendarViewMode === 'list' ? 'var(--text-secondary)' : 'var(--text-tertiary)', borderLeft: '1px solid var(--border-color)' }}>
                                 <ListIcon size={18} />
                             </button>
                         </div>
@@ -272,7 +272,7 @@ function App() {
                         <ShortcutCard icon={<Monitor color="#0277BD" size={24} />} label="Lab" color="#E1F5FE" onClick={() => openQuickAdd('labs')} />
                     </div>
 
-                    <div style={{ background: 'white', borderRadius: '12px 12px 0 0', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #e0e0e0', borderBottom: 'none' }}>
+                    <div style={{ background: 'var(--bg-primary)', borderRadius: '12px 12px 0 0', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderBottom: 'none' }}>
                         <button className="btn-outline" onClick={prevMonth} style={{ width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}><ChevronLeft /></button>
                         <h2 style={{ fontSize: '1.5rem', textTransform: 'capitalize' }}>{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</h2>
                         <button className="btn-outline" onClick={nextMonth} style={{ width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}><ChevronRight /></button>
@@ -306,15 +306,15 @@ function App() {
                             })}
                         </div>
                     ) : (
-                        <div style={{ border: '1px solid #e0e0e0', borderTop: 'none', background: 'white', borderRadius: '0 0 12px 12px' }}>
+                        <div style={{ border: '1px solid var(--border-color)', borderTop: 'none', background: 'var(--bg-primary)', borderRadius: '0 0 12px 12px' }}>
                             {calendarDays.filter(d => isSameMonth(d, monthStart)).map((dayItem, idx) => {
                                 const dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
                                 if (dayLessons.length === 0) return null;
                                 return (
-                                    <div key={idx} style={{ padding: '15px', borderBottom: '1px solid #eee', display: 'flex', gap: '20px', flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
+                                    <div key={idx} style={{ padding: '15px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '20px', flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
                                         <div style={{ minWidth: '60px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#004587' }}>{format(dayItem, 'd')}</div>
-                                            <div style={{ fontSize: '0.85rem', color: '#666', textTransform: 'uppercase' }}>{format(dayItem, 'EEE', { locale: ptBR })}</div>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>{format(dayItem, 'd')}</div>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{format(dayItem, 'EEE', { locale: ptBR })}</div>
                                         </div>
                                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                             {dayLessons.map((lesson, lIdx) => (
@@ -325,7 +325,7 @@ function App() {
                                 )
                             })}
                             {lessons.filter(l => isSameMonth(l.date, monthStart)).length === 0 && (
-                                <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>Nenhuma aula agendada para este mês.</div>
+                                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>Nenhuma aula agendada para este mês.</div>
                             )}
                         </div>
                     )}
@@ -376,35 +376,97 @@ function LessonCard({ lesson, horizontal, onClick }) {
                 style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '20px',
-                    padding: '10px 15px',
+                    gap: '15px',
+                    padding: '12px',
                     borderRadius: '8px',
-                    backgroundColor: lesson.period === 'Tarde' ? '#E3F2FD' : '#F3E5F5',
+                    backgroundColor: lesson.period === 'Tarde' ? 'var(--bg-secondary)' : 'var(--bg-tertiary, #F3E5F5)', // Prepared for dark mode var usage
                     borderLeft: `4px solid ${lesson.period === 'Tarde' ? '#2196F3' : '#9C27B0'}`,
                     flexWrap: 'wrap',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                 }}>
-                <div style={{ width: '60px', fontWeight: '600' }}>{lesson.period}</div>
-                <div style={{ width: '80px', fontWeight: 'bold' }}>{lesson.turma}</div>
-                <div style={{ flex: 1, minWidth: '120px' }}>{lesson.uc}</div>
-                <div style={{ fontWeight: '600', color: '#555' }}>{lesson.lab}</div>
-                {lesson.description && <div style={{ fontSize: '0.85rem', color: '#666', width: '100%', marginTop: '5px' }}>{lesson.description}</div>}
+                {/* 1. Period */}
+                <div style={{ width: '60px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-primary)' }}>{lesson.period}</div>
+
+                {/* 2. Class (Turma) */}
+                <div style={{ width: '80px', fontWeight: 'bold', fontSize: '0.95rem', color: 'var(--text-primary)' }}>{lesson.turma}</div>
+
+                {/* 3. UC */}
+                <div style={{ flex: 1, minWidth: '150px', fontWeight: '500', color: 'var(--text-secondary)' }}>{lesson.uc}</div>
+
+                {/* 4. Lab */}
+                <div style={{ fontWeight: '600', color: '#555', fontSize: '0.85rem' }}>{lesson.lab}</div>
+
+                {/* 5. Description */}
+                {lesson.description && (
+                    <div style={{
+                        fontSize: '0.85rem',
+                        color: 'var(--text-tertiary, #666)',
+                        width: '100%',
+                        marginTop: '4px',
+                        borderTop: '1px solid rgba(0,0,0,0.05)',
+                        paddingTop: '4px'
+                    }}>
+                        {lesson.description}
+                    </div>
+                )}
             </div>
         )
     }
 
+    // Grid View
+    const getPeriodClass = (period) => {
+        const normalizedPeriod = period?.toLowerCase();
+        if (normalizedPeriod === 'manhã' || normalizedPeriod === 'manha') return 'event-morning';
+        if (normalizedPeriod === 'tarde') return 'event-afternoon';
+        if (normalizedPeriod === 'noite') return 'event-night';
+        // Fallback for backward compatibility
+        return 'event-afternoon';
+    };
+
     return (
         <div
             onClick={onClick}
-            className={`event-card ${lesson.period === 'Tarde' ? 'event-blue' : 'event-purple'}`}
+            className={`event-card ${getPeriodClass(lesson.period)}`}
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px',
+                padding: '6px',
+                borderRadius: '6px',
+                minHeight: '80px'
+            }}
         >
+            {/* 1. Period */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
                 {lesson.period === 'Noite' ? <span style={{ fontSize: '0.8rem' }}>🌙</span> : <span style={{ fontSize: '0.8rem' }}>☀️</span>}
                 <strong style={{ fontSize: '0.75rem' }}>{lesson.period}</strong>
             </div>
-            <div style={{ fontWeight: '700', fontSize: '0.8rem', marginBottom: '1px' }}>{lesson.turma}</div>
-            <div style={{ fontSize: '0.75rem', marginBottom: '4px' }}>{lesson.uc}</div>
-            <div style={{ textAlign: 'right', fontSize: '0.7rem', opacity: 0.8, fontWeight: '600' }}>{lesson.lab}</div>
+
+            {/* 2. Class (Turma) */}
+            <div style={{ fontWeight: '700', fontSize: '0.85rem', lineHeight: '1.2' }}>{lesson.turma}</div>
+
+            {/* 3. UC */}
+            <div style={{ fontSize: '0.75rem', lineHeight: '1.2', margin: '2px 0' }}>{lesson.uc}</div>
+
+            {/* 4. Lab */}
+            <div style={{ fontSize: '0.7rem', opacity: 0.9, fontWeight: '600' }}>{lesson.lab}</div>
+
+            {/* 5. Description */}
+            {lesson.description && (
+                <div style={{
+                    fontSize: '0.7rem',
+                    opacity: 0.8,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    borderTop: '1px solid rgba(255,255,255,0.2)',
+                    marginTop: '2px',
+                    paddingTop: '2px'
+                }}>
+                    {lesson.description}
+                </div>
+            )}
         </div>
     )
 }
@@ -414,22 +476,22 @@ function ShortcutCard({ icon, label, color, onClick }) {
         <div
             onClick={onClick}
             style={{
-                background: 'white',
+                background: 'var(--bg-primary)',
                 padding: '24px',
                 borderRadius: '16px',
-                border: '1px solid #e0e0e0',
+                border: '1px solid var(--border-color)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '15px',
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                boxShadow: 'var(--card-shadow)',
                 transition: 'transform 0.2s',
             }}
             onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
             onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
         >
             <div style={{ padding: '12px', borderRadius: '12px', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</div>
-            <span style={{ fontWeight: 600, fontSize: '1.2rem', color: '#333' }}>{label}</span>
+            <span style={{ fontWeight: 600, fontSize: '1.2rem', color: 'var(--text-primary)' }}>{label}</span>
         </div>
     )
 }

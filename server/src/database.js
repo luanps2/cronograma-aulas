@@ -61,6 +61,17 @@ db.exec(`
     FOREIGN KEY (courseId) REFERENCES courses (id),
     FOREIGN KEY (ucId) REFERENCES ucs (id)
   );
+
+  CREATE TABLE IF NOT EXISTS custom_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    category TEXT NOT NULL,
+    icon TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+  );
 `);
 
 // Migration for existing tables: Add columns if they don't exist

@@ -1,86 +1,152 @@
-# Planejamento Acadêmico - Senac
+# SenacTech - Sistema de Gestão Acadêmica
 
-Este projeto é uma aplicação web para professores do Senac organizarem suas aulas, com funcionalidades de calendário, importação de planilhas via IA e gestão de turmas/UCs.
+## 1. Visão Geral
 
-## Tecnologias Utilizadas
+### Objetivo
+O **SenacTech** é uma aplicação web desenvolvida para otimizar a gestão acadêmica do SENAC, com foco na organização estruturada de Cursos, Unidades Curriculares (UCs), Turmas e Laboratórios, além de facilitar o planejamento de aulas.
 
-- **Frontend**: React (Vite), Styled Components (CSS Modules/Inline), Lucide React (Ícones), Axios.
-- **Backend**: Node.js, Express, MongoDB (Mongoose), Multer (Upload de arquivos).
-- **Design**: Inspirado na identidade visual do Senac (Laranja e Azul).
+### Público-Alvo
+- **Gestores (Managers)**: Responsáveis pelo cadastro de dados mestres (Cursos, UCs, Turmas, Labs) e visão geral.
+- **Operadores/Docentes**: Responsáveis pelo uso diário, consulta de cronogramas e gestão de aulas.
 
-## Pré-requisitos
-
-- **Node.js**: Versão 18 ou superior.
-- **MongoDB**: Banco de dados rodando localmente (porta 27017) ou uma URI de conexão válida.
-
-## Como Rodar o Projeto
-
-Siga os passos abaixo para iniciar a aplicação completa (Frontend + Backend).
-
-### 1. Configuração do Backend (Servidor)
-
-Abra um terminal na raiz do projeto e execute:
-
-```bash
-# Entre na pasta do servidor
-cd server
-
-# Instale as dependências (se ainda não fez)
-npm install
-
-# Inicie o servidor
-npm start
-
-#Buscar process rodando na porta do server
-netstat -ano | findstr :5000
-
-# Parar servidor manualmente
-taskkill /PID 15220 /F
-```
-
-
-
-O servidor iniciará na porta **5000**.
-Você verá a mensagem: `'Server running on http://localhost:5000'` e `'MongoDB Linked'` (se o banco estiver rodando).
-
-### 2. Configuração do Frontend (Cliente)
-
-Abra **outro** terminal na raiz do projeto e execute:
-
-```bash
-# Entre na pasta do cliente
-cd client
-
-# Instale as dependências (se ainda não fez)
-npm install
-
-# Inicie a aplicação
-npm run dev
-```
-
-O frontend iniciará na porta **5173** (ou próxima disponível).
-Acesse no navegador: `http://localhost:5173`
-
-## Funcionalidades Disponíveis
-
-1.  **Login**: Tela de autenticação (Simulação - clique em "Entrar" ou use Google/Microsoft).
-2.  **Calendário**: Visualização mensal das aulas.
-    - Navegação entre meses.
-    - Visualização em Grid ou Lista.
-3.  **Nova Aula**: Botão "+ Nova Aula" para adicionar (Simulação de formulário).
-4.  **Importar Excel**: Botão para upload de print de planilhas (Simulação com delay).
-5.  **Configurações**: Gerenciamento de Cursos, Turmas, UCs e Laboratórios.
-
-## Estrutura de Pastas
-
-- `/client`: Código fonte do Frontend (React).
-- `/server`: Código fonte da API (Node.js).
-- `/uploads`: Pasta temporária para uploads de arquivos.
-
-## Notas Importantes
-
-- O projeto está configurado para conectar ao MongoDB local (`mongodb://localhost:27017/senac-calendar`). Certifique-se que o serviço do Mongo está rodando.
-- A funcionalidade de IA para leitura de Excel está simulada (mock) para demonstração de interface.
+### Principais Funcionalidades
+- **Gestão Hierárquica**: Cadastro de Cursos e suas respectivas Unidades Curriculares.
+- **Gestão de Recursos**: Administração de Turmas e Laboratórios.
+- **Calendário de Aulas**: Visualização mensal/semanal de alocações (em desenvolvimento).
+- **Importação Inteligente**: Capacidade de importar cronogramas via imagem (OCR/LLM).
+- **Configurações Centralizadas**: Interface unificada para gestão de todas as entidades do sistema.
 
 ---
-Desenvolvido por Luan (IA Assistant)
+
+## 2. Arquitetura
+
+O projeto segue uma arquitetura moderna de **Single Page Application (SPA)** desacoplada:
+
+- **Frontend**: React.js (Vite), focado em performance, componentes funcionais e estilização modular (CSS puro/Modules).
+- **Backend**: Node.js (Express), focado em fornecer uma API RESTful robusta.
+- **Banco de Dados**: SQLite (via `sqlite3`), garantindo simplicidade e portabilidade local, mas escalável para outros SQLs se necessário.
+
+### Decisões Arquiteturais
+- **Camadas (Backend)**:
+  - `Routes`: Definição de endpoints.
+  - `Controllers`: Lógica de entrada/saída HTTP.
+  - `Models`: Acesso a dados (Data Access Layer).
+  - `Services`: Regras de negócio complexas.
+- **Componentização (Frontend)**:
+  - Componentes reutilizáveis (`SettingsFormModal`, forms genéricos).
+  - Páginas principais como orquestradores de estado (`SettingsView`, `CalendarView`).
+
+---
+
+## 3. Modelo de Dados
+
+### Entidades Principais
+
+- **Users (`users`)**
+  - Gestão de acesso e perfis (Manager/Operator).
+  - Integração com Google OAuth (`google_id`, `avatar_url`).
+
+- **Cursos (`courses`)**
+  - Entidade raiz da estrutura acadêmica.
+  - Ex: "Técnico em Informática".
+
+- **Unidades Curriculares (`ucs`)**
+  - Disciplinas vinculadas obrigatoriamente a um Curso.
+  - Atributos: Nome, Carga Horária (`hours`), Descrição.
+  - **Regra**: Uma UC não pode existir sem um Curso pai.
+
+- **Turmas (`classes`)**
+  - Grupos de alunos vinculados a um Curso.
+  - Identificados por número/código (ex: "Turma 27").
+
+- **Laboratórios (`labs`)**
+  - Recursos físicos disponíveis.
+  - Atributos: Nome, Capacidade.
+
+- **Aulas (`lessons`)**
+  - A unidade de agendamento.
+  - Relaciona: Turma + UC + Data + Horário.
+
+---
+
+## 4. Autenticação
+
+### Fluxo de Login
+1. **Google OAuth 2.0**: O usuário clica em "Entrar com Google".
+2. **Frontend**: Solicita token de acesso ao Google.
+3. **Backend**: Recebe o token, valida junto ao Google, e cria/atualiza o usuário no banco local.
+4. **Sessão**: O backend retorna os dados do usuário (incluindo avatar e role). O frontend persiste estado de autenticação (simulado/local).
+
+### Proteção
+- Rotas protegidas no Frontend (redirecionam para Login se não autenticado).
+- Validação de sessão no Backend (Middleware de Auth).
+
+---
+
+## 5. Funcionalidades Detalhadas
+
+### Tela de Configurações (`SettingsView`)
+Centraliza o CRUD (Create, Read, Update, Delete) do sistema.
+- **Layout de 3 Colunas**:
+  1. **Estrutura Acadêmica**: Accordion de Cursos. Ao expandir, exibe as UCs e o total de horas calculado.
+  2. **Turmas**: Lista simples de turmas.
+  3. **Laboratórios**: Lista de labs disponíveis.
+- **Modais**: Edição e criação feitas em janelas sobrepostas para manter o contexto.
+
+### Importação de Aulas
+(Em desenvolvimento) Permite envio de print de tabelas/horários, processado por LLM para gerar registros de `lessons` automaticamente.
+
+---
+
+## 6. Como Rodar o Projeto
+
+### Pré-requisitos
+- Node.js (v18+)
+- NPM
+- Chave de API OpenAI (Opcional, para recursos de IA)
+- Credenciais Google Cloud (para Login)
+
+### Executando o Backend
+1. Navegue até a pasta `server`:
+   ```bash
+   cd server
+   ```
+2. Instale as dependências:
+   ```bash
+   npm install
+   ```
+3. Configure o `.env` (baseado no `.env.example`):
+   - `PORT=5000`
+   - `GOOGLE_CLIENT_ID=...`
+4. Inicie o servidor:
+   ```bash
+   npm start
+   ```
+   *O banco SQLite será criado automaticamente na primeira execução.*
+
+### Executando o Frontend
+1. Navegue até a pasta `client`:
+   ```bash
+   cd client
+   ```
+2. Instale as dependências:
+   ```bash
+   npm install
+   ```
+3. Inicie o servidor de desenvolvimento:
+   ```bash
+   npm run dev
+   ```
+4. Acesso: `http://localhost:5173`
+
+---
+
+## 7. Boas Práticas e Observações
+
+- **Hierarquia de Dados**: O sistema impõe rigidez na relação Curso -> UC. Não delete um Curso sem considerar suas UCs.
+- **Hooks Reacts**: O desenvolvimento segue regras estritas (`SKILL.md`) para evitar bugs de renderização (hooks sempre no topo, sem condicionais).
+- **Tratamento de Erros**: O Backend deve sempre retornar JSON com campo `error` em caso de falha.
+- **UI/UX**: Prioridade para feedback visual imediato (loading states, modais, toasts).
+
+---
+*Documentação gerada em Fev/2026 - Versão 1.0*

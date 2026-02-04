@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import ConfirmModal from './ConfirmModal';
+import Modal from './Modal';
 
 export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, lesson }) {
     const isEditing = !!lesson;
@@ -26,7 +27,6 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
 
     useEffect(() => {
         if (isOpen) {
-            // Reset or Load Lesson
             if (isEditing && lesson) {
                 setFormData({
                     courseId: lesson.courseId,
@@ -48,48 +48,37 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                     date: initialDate || new Date()
                 });
             }
-            fetchInitialData();
+            fetchOptions();
         }
-    }, [isOpen, initialDate, lesson]);
+    }, [isOpen, lesson, initialDate, isEditing]);
 
-    // Fetch UCs whenever course changes
-    useEffect(() => {
-        if (formData.courseId) {
-            fetchUCsByCourse(formData.courseId);
-        } else {
-            setUcs([]);
-            if (!isEditing) { // Only clear if not initial edit load
-                setFormData(prev => ({ ...prev, ucId: '' }));
-            }
-        }
-    }, [formData.courseId]);
-
-    const fetchInitialData = async () => {
+    const fetchOptions = async () => {
         setLoading(true);
         try {
-            const [resCourses, resClasses, resLabs] = await Promise.all([
-                axios.get('http://localhost:5000/api/settings/courses'),
-                axios.get('http://localhost:5000/api/settings/classes'),
-                axios.get('http://localhost:5000/api/settings/labs')
+            const [coursesRes, classesRes, labsRes] = await Promise.all([
+                axios.get('http://localhost:5000/api/courses'),
+                axios.get('http://localhost:5000/api/classes'),
+                axios.get('http://localhost:5000/api/labs')
             ]);
-            setCourses(resCourses.data);
-            setClasses(resClasses.data);
-            setLabs(resLabs.data);
-        } catch (error) {
-            console.error('Error fetching modal data:', error);
+            setCourses(coursesRes.data);
+            setClasses(classesRes.data);
+            setLabs(labsRes.data);
+        } catch (err) {
+            console.error('Error fetching options:', err);
         } finally {
             setLoading(false);
         }
     };
 
-    const fetchUCsByCourse = async (courseId) => {
-        try {
-            const res = await axios.get(`http://localhost:5000/api/settings/courses/${courseId}/ucs`);
-            setUcs(res.data);
-        } catch (error) {
-            console.error('Error fetching filtered UCs:', error);
+    useEffect(() => {
+        if (formData.courseId) {
+            axios.get(`http://localhost:5000/api/ucs?courseId=${formData.courseId}`)
+                .then(res => setUcs(res.data))
+                .catch(err => console.error(err));
+        } else {
+            setUcs([]);
         }
-    };
+    }, [formData.courseId]);
 
     const handleChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -97,88 +86,79 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
 
     const handleSave = async () => {
         if (!formData.courseId || !formData.ucId || !formData.turma || !formData.lab || !formData.period) {
-            setConfirmModal({
-                isOpen: true,
-                type: 'error',
-                title: 'Campos Obrigatórios',
-                message: 'Por favor, preencha todos os campos obrigatórios (*)',
-                confirmText: 'Entendi'
-            });
+            alert('Preencha todos os campos obrigatórios!');
             return;
         }
-
         setSaving(true);
         try {
-            if (isEditing) {
-                await axios.put(`http://localhost:5000/api/lessons/${lesson.id}`, formData);
+            const payload = {
+                courseId: parseInt(formData.courseId),
+                ucId: parseInt(formData.ucId),
+                turma: formData.turma,
+                lab: formData.lab,
+                period: formData.period,
+                description: formData.description,
+                date: formData.date.toISOString()
+            };
+
+            if (isEditing && lesson?._id) {
+                await axios.put(`http://localhost:5000/api/lessons/${lesson._id}`, payload);
             } else {
-                await axios.post('http://localhost:5000/api/lessons', formData);
+                await axios.post('http://localhost:5000/api/lessons', payload);
             }
+
             onSave();
             onClose();
-        } catch (error) {
-            const message = error.response?.data?.error || 'Erro ao salvar aula';
-            setConfirmModal({
-                isOpen: true,
-                type: 'error',
-                title: 'Erro ao Salvar',
-                message: message,
-                confirmText: 'Fechar'
-            });
+        } catch (err) {
+            console.error('Error saving lesson:', err);
+            alert('Erro ao salvar aula. Tente novamente.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!lesson?._id) return;
+        try {
+            await axios.delete(`http://localhost:5000/api/lessons/${lesson._id}`);
+            onSave();
+            onClose();
+        } catch (err) {
+            console.error('Error deleting lesson:', err);
+            alert('Erro ao excluir aula.');
         }
     };
 
     const handleDeleteClick = () => {
         setConfirmModal({
             isOpen: true,
-            type: 'confirm',
-            title: 'Excluir Aula',
+            type: 'delete',
+            title: 'Confirmar Exclusão',
             message: 'Tem certeza que deseja excluir esta aula? Esta ação não pode ser desfeita.',
             confirmText: 'Excluir',
-            onConfirm: executeDelete
+            onConfirm: () => {
+                setConfirmModal({ ...confirmModal, isOpen: false });
+                handleDelete();
+            }
         });
     };
 
-    const executeDelete = async () => {
-        setSaving(true);
-        try {
-            await axios.delete(`http://localhost:5000/api/lessons/${lesson.id}`);
-            onSave();
-            onClose();
-        } catch (error) {
-            setConfirmModal({
-                isOpen: true,
-                type: 'error',
-                title: 'Erro ao Excluir',
-                message: 'Não foi possível excluir a aula. Tente novamente.',
-                confirmText: 'Fechar'
-            });
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    if (!isOpen) return null;
+    const modalTitle = (
+        <div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '4px' }}>
+                {isEditing ? 'Editar Aula' : 'Nova Aula'}
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', fontWeight: 400 }}>
+                {(formData.date instanceof Date && !isNaN(formData.date))
+                    ? formData.date.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                    : 'Data Inválida'}
+            </div>
+        </div>
+    );
 
     return (
-        <div className="modal-overlay">
-            <div className="modal" style={{ maxWidth: '540px', width: '90%' }}>
-                <div style={{ padding: '20px', borderBottom: '1px solid #E0E0E0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <h2 style={{ fontSize: '1.25rem', color: '#1A1A1A', margin: 0 }}>
-                            {isEditing ? 'Editar Aula' : 'Nova Aula'}
-                        </h2>
-                        <span style={{ fontSize: '0.9rem', color: '#666' }}>
-                            {(formData.date instanceof Date && !isNaN(formData.date))
-                                ? formData.date.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-                                : 'Data Inválida'}
-                        </span>
-                    </div>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#666" /></button>
-                </div>
-
+        <>
+            <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} maxWidth="540px">
                 <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
                     {loading ? (
                         <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 className="animate-spin" /> Carregando opções...</div>
@@ -186,9 +166,9 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                         <>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: '#555' }}>Curso *</label>
+                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Curso *</label>
                                     <select
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #DDD', fontSize: '0.9rem' }}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.9rem' }}
                                         onChange={(e) => handleChange('courseId', e.target.value)}
                                         value={formData.courseId}
                                     >
@@ -197,9 +177,9 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                                     </select>
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: '#555' }}>Turma *</label>
+                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Turma *</label>
                                     <select
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #DDD', fontSize: '0.9rem' }}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.9rem' }}
                                         onChange={(e) => handleChange('turma', e.target.value)}
                                         value={formData.turma}
                                     >
@@ -212,16 +192,15 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                             </div>
 
                             <div>
-                                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: '#555' }}>Unidade Curricular (UC) *</label>
+                                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Unidade Curricular (UC) *</label>
                                 <select
                                     disabled={!formData.courseId}
                                     style={{
                                         width: '100%',
                                         padding: '10px',
                                         borderRadius: '8px',
-                                        border: '1px solid #DDD',
                                         fontSize: '0.9rem',
-                                        background: !formData.courseId ? '#FAFAFA' : 'white'
+                                        opacity: !formData.courseId ? 0.6 : 1
                                     }}
                                     onChange={(e) => handleChange('ucId', e.target.value)}
                                     value={formData.ucId}
@@ -235,9 +214,9 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: '#555' }}>Laboratório *</label>
+                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Laboratório *</label>
                                     <select
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #DDD', fontSize: '0.9rem' }}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.9rem' }}
                                         onChange={(e) => handleChange('lab', e.target.value)}
                                         value={formData.lab}
                                     >
@@ -248,9 +227,9 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                                     </select>
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: '#555' }}>Período *</label>
+                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Período *</label>
                                     <select
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #DDD', fontSize: '0.9rem' }}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.9rem' }}
                                         onChange={(e) => handleChange('period', e.target.value)}
                                         value={formData.period}
                                     >
@@ -263,11 +242,11 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                             </div>
 
                             <div>
-                                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: '#555' }}>Plano de Aula</label>
+                                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Plano de Aula</label>
                                 <textarea
                                     placeholder="Conteúdo programático da aula..."
                                     rows={3}
-                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #DDD', fontSize: '0.9rem', fontFamily: 'inherit' }}
+                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.9rem', fontFamily: 'inherit' }}
                                     onChange={(e) => handleChange('description', e.target.value)}
                                     value={formData.description}
                                 />
@@ -276,20 +255,20 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                     )}
                 </div>
 
-                <div style={{ padding: '20px', borderTop: '1px solid #E0E0E0', display: 'flex', justifyContent: isEditing ? 'space-between' : 'flex-end', gap: '10px', background: '#FAFAFA', borderRadius: '0 0 12px 12px' }}>
+                <div style={{ padding: '20px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: isEditing ? 'space-between' : 'flex-end', gap: '10px', background: 'var(--bg-tertiary)', borderRadius: '0 0 16px 16px' }}>
                     {isEditing && (
                         <button onClick={handleDeleteClick} className="btn-outline" style={{ color: '#D32F2F', borderColor: '#FFCDD2', background: '#FFEBEE' }}>
                             <Trash2 size={18} /> Excluir
                         </button>
                     )}
                     <div style={{ display: 'flex', gap: '10px' }}>
-                        <button className="btn-outline" style={{ background: 'white' }} onClick={onClose} disabled={saving}>Cancelar</button>
+                        <button className="btn-outline" onClick={onClose} disabled={saving}>Cancelar</button>
                         <button className="btn-primary" onClick={handleSave} disabled={saving}>
                             {saving ? 'Salvando...' : (isEditing ? 'Atualizar Aula' : 'Criar Aula')}
                         </button>
                     </div>
                 </div>
-            </div>
+            </Modal>
 
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
@@ -300,7 +279,6 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                 confirmText={confirmModal.confirmText}
                 onConfirm={confirmModal.onConfirm}
             />
-        </div>
+        </>
     );
 }
-

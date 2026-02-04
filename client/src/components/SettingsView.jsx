@@ -1,38 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Trash2, Plus, GraduationCap, Users, BookOpen, Monitor, Loader2, Edit2, X } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, GraduationCap, Users, BookOpen, Monitor, Loader2, Edit2, ChevronDown, ChevronRight, Calendar, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import CourseForm from './forms/CourseForm';
 import ClassForm from './forms/ClassForm';
 import UCForm from './forms/UCForm';
 import LabForm from './forms/LabForm';
+import SettingsFormModal from './SettingsFormModal';
 
 export default function SettingsView({ onBack }) {
     const [courses, setCourses] = useState([]);
     const [classes, setClasses] = useState([]);
-    const [ucs, setUcs] = useState([]);
     const [labs, setLabs] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Context states
-    const [selectedCourseForUCs, setSelectedCourseForUCs] = useState(null);
+    // Accordion State for Courses
+    // Storing expanded course ID to fetch and show UCs
+    const [expandedCourseId, setExpandedCourseId] = useState(null);
+    const [courseUCs, setCourseUCs] = useState({}); // Cache UCs by courseId: { [id]: [ucs] }
+    const [loadingUCs, setLoadingUCs] = useState({}); // Loading state by courseId
 
-    // Edit states
-    const [editingCourse, setEditingCourse] = useState(null);
-    const [editingClass, setEditingClass] = useState(null);
-    const [editingUC, setEditingUC] = useState(null);
-    const [editingLab, setEditingLab] = useState(null);
+    // Modal State
+    const [modalConfig, setModalConfig] = useState({
+        isOpen: false,
+        type: null, // 'course', 'uc', 'class', 'lab'
+        data: null, // Editing data or null for new
+        parentId: null // For UCs (courseId)
+    });
+
+    // Clear Month State
+    const [clearModal, setClearModal] = useState({ isOpen: false, year: new Date().getFullYear(), month: new Date().getMonth() });
+    const [clearing, setClearing] = useState(false);
 
     useEffect(() => {
         fetchAll();
     }, []);
 
+    // Fetch UCs when a course is expanded and not yet cached (or invalid)
     useEffect(() => {
-        if (selectedCourseForUCs) {
-            fetchUCsByCourse(selectedCourseForUCs.id || selectedCourseForUCs._id);
-        } else {
-            setUcs([]);
+        if (expandedCourseId && !courseUCs[expandedCourseId]) {
+            fetchUCsByCourse(expandedCourseId);
         }
-    }, [selectedCourseForUCs]);
+    }, [expandedCourseId]);
 
     const fetchAll = async () => {
         try {
@@ -52,20 +60,29 @@ export default function SettingsView({ onBack }) {
     };
 
     const fetchUCsByCourse = async (courseId) => {
+        setLoadingUCs(prev => ({ ...prev, [courseId]: true }));
         try {
             const res = await axios.get(`http://localhost:5000/api/settings/courses/${courseId}/ucs`);
-            setUcs(res.data);
+            setCourseUCs(prev => ({ ...prev, [courseId]: res.data }));
         } catch (error) {
             console.error('Error fetching UCs:', error);
+        } finally {
+            setLoadingUCs(prev => ({ ...prev, [courseId]: false }));
         }
     };
 
-    const handleDelete = async (type, id) => {
+    const handleToggleCourse = (courseId) => {
+        setExpandedCourseId(prev => prev === courseId ? null : courseId);
+    };
+
+    const handleDelete = async (type, id, parentId = null) => {
         if (!confirm('Tem certeza que deseja excluir?')) return;
         try {
             await axios.delete(`http://localhost:5000/api/settings/${type}/${id}`);
-            if (type === 'ucs' && selectedCourseForUCs) {
-                fetchUCsByCourse(selectedCourseForUCs.id || selectedCourseForUCs._id);
+
+            if (type === 'ucs' && parentId) {
+                // Refresh specific course UCs
+                fetchUCsByCourse(parentId);
             } else {
                 fetchAll();
             }
@@ -75,12 +92,20 @@ export default function SettingsView({ onBack }) {
         }
     };
 
+    const handleOpenModal = (type, data = null, parentId = null) => {
+        setModalConfig({ isOpen: true, type, data, parentId });
+    };
+
+    const handleCloseModal = () => {
+        setModalConfig({ isOpen: false, type: null, data: null, parentId: null });
+    };
+
     const handleCreateOrUpdate = async (type, data, id = null) => {
         try {
-            // Inject context courseId for UCs if creation
             let finalData = { ...data };
-            if (type === 'ucs' && selectedCourseForUCs) {
-                finalData.courseId = selectedCourseForUCs.id || selectedCourseForUCs._id;
+            // Inject parent ID if necessary (for UCs)
+            if (type === 'ucs' && modalConfig.parentId) {
+                finalData.courseId = modalConfig.parentId;
             }
 
             if (id) {
@@ -89,20 +114,34 @@ export default function SettingsView({ onBack }) {
                 await axios.post(`http://localhost:5000/api/settings/${type}`, finalData);
             }
 
-            // Clear editing states
-            setEditingCourse(null);
-            setEditingClass(null);
-            setEditingUC(null);
-            setEditingLab(null);
+            handleCloseModal();
 
-            if (type === 'ucs' && selectedCourseForUCs) {
-                fetchUCsByCourse(selectedCourseForUCs.id || selectedCourseForUCs._id);
+            if (type === 'ucs' && modalConfig.parentId) {
+                fetchUCsByCourse(modalConfig.parentId);
             } else {
                 fetchAll();
             }
         } catch (error) {
             const message = error.response?.data?.error || 'Erro ao salvar item';
             alert(message);
+        }
+    };
+
+    const handleClearMonth = async () => {
+        if (!confirm(`ATENÇÃO: Isso apagará TODAS as aulas de ${clearModal.month + 1}/${clearModal.year}. Confirmar?`)) return;
+
+        setClearing(true);
+        try {
+            const res = await axios.delete('http://localhost:5000/api/lessons/clear-month', {
+                data: { year: clearModal.year, month: clearModal.month + 1 } // API expects 1-based month
+            });
+            alert(res.data.message || 'Calendário limpo com sucesso.');
+            setClearModal({ ...clearModal, isOpen: false });
+        } catch (error) {
+            console.error('Error clearing month:', error);
+            alert('Erro ao limpar calendário.');
+        } finally {
+            setClearing(false);
         }
     };
 
@@ -124,115 +163,112 @@ export default function SettingsView({ onBack }) {
             </header>
 
             <div className="settings-grid">
-                {/* CURSOS */}
-                <SettingsColumn title="Cursos" count={`${courses.length} cursos`} icon={<GraduationCap size={20} color="#5E35B1" />} iconBg="#EDE7F6">
-                    <div style={{ padding: '0 15px 15px 15px' }}>
-                        <CourseForm
-                            initialData={editingCourse}
-                            onSubmit={(data) => handleCreateOrUpdate('courses', data, editingCourse?._id)}
-                            onCancel={() => setEditingCourse(null)}
-                        />
-                    </div>
-                    <div className="settings-scroll">
-                        {courses.map(course => (
-                            <div
-                                key={course._id}
-                                className={`card-item ${selectedCourseForUCs?._id === course._id ? 'selected' : ''}`}
-                                style={{
-                                    cursor: 'pointer',
-                                    border: selectedCourseForUCs?._id === course._id ? '2px solid #5E35B1' : editingCourse?._id === course._id ? '2px solid #5E35B1' : '1px solid #EEE'
-                                }}
-                                onClick={() => { setEditingCourse(course); setSelectedCourseForUCs(course); }}
-                            >
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: 700, color: '#5E35B1', fontSize: '0.95rem', marginBottom: '4px' }}>{course.acronym}</div>
-                                    <div style={{ fontSize: '0.85rem', color: '#333' }}>{course.name}</div>
-                                </div>
-                                <div style={{ display: 'flex', gap: '5px' }}>
-                                    <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); setEditingCourse(course); }}><Edit2 size={16} /></button>
-                                    <button className="btn-icon-delete" onClick={(e) => { e.stopPropagation(); handleDelete('courses', course._id); }}><Trash2 size={16} /></button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </SettingsColumn>
-
-                {/* UNIDADES CURRICULARES (Obrigatório Curso) */}
+                {/* CURSOS & UCs (Merged Column) */}
                 <SettingsColumn
-                    title="Unidades Curriculares"
-                    count={selectedCourseForUCs ? `${ucs.length} UCs em ${selectedCourseForUCs.acronym}` : 'Selecione um curso'}
-                    icon={<BookOpen size={20} color="#0277BD" />}
-                    iconBg="#E1F5FE"
+                    title="Estrutura Acadêmica (Cursos e UCs)"
+                    count={`${courses.length} cursos`}
+                    icon={<GraduationCap size={20} color="#5E35B1" />}
+                    iconBg="#EDE7F6"
+                    action={<button className="btn-icon-add" onClick={() => handleOpenModal('course')}><Plus size={18} /></button>}
                 >
-                    {selectedCourseForUCs ? (
-                        <>
-                            <div style={{ padding: '15px' }}>
-                                <div style={{ padding: '8px 12px', background: '#E3F2FD', borderRadius: '6px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#01579B' }}>
-                                        Curso: {selectedCourseForUCs.acronym}
-                                    </span>
-                                    <button onClick={() => setSelectedCourseForUCs(null)} style={{ background: 'none', border: 'none', color: '#0277BD', cursor: 'pointer', fontSize: '0.8rem' }}>Trocar</button>
-                                </div>
-                                <UCForm
-                                    courses={courses}
-                                    initialData={editingUC}
-                                    onSubmit={(data) => handleCreateOrUpdate('ucs', data, editingUC?._id)}
-                                    onCancel={() => setEditingUC(null)}
-                                />
-                            </div>
-                            <div className="settings-scroll">
-                                {ucs.map(uc => (
+                    <div className="settings-scroll">
+                        {courses.map(course => {
+                            const isExpanded = expandedCourseId === course._id;
+                            const ucs = courseUCs[course._id] || [];
+                            const isLoadingUCs = loadingUCs[course._id];
+
+                            // Calculate Total Hours securely
+                            const totalHours = ucs.reduce((acc, uc) => {
+                                const h = parseInt(String(uc.hours || 0).replace(/\D/g, ''), 10) || 0;
+                                return acc + h;
+                            }, 0);
+
+                            return (
+                                <div key={course._id} className={`course-card ${isExpanded ? 'expanded' : ''}`}>
                                     <div
-                                        key={uc._id}
-                                        className="card-item"
-                                        style={{ display: 'block', border: editingUC?._id === uc._id ? '2px solid #0277BD' : '', cursor: 'pointer' }}
-                                        onClick={() => setEditingUC(uc)}
+                                        className="course-header"
+                                        onClick={() => handleToggleCourse(course._id)}
                                     >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{uc.name}</span>
-                                            <span style={{ background: '#FFF3E0', color: '#F57C00', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>{uc.hours}</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                                            {isExpanded ? <ChevronDown size={18} color="#5E35B1" /> : <ChevronRight size={18} color="#666" />}
+                                            <div style={{ fontWeight: 700, color: '#5E35B1', fontSize: '0.95rem' }}>{course.acronym}</div>
+                                            <div style={{ fontSize: '0.85rem', color: '#333' }}>- {course.name}</div>
                                         </div>
-                                        <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>{uc.desc}</div>
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '5px' }}>
-                                            <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); setEditingUC(uc); }}><Edit2 size={16} /></button>
-                                            <button className="btn-icon-delete" onClick={(e) => { e.stopPropagation(); handleDelete('ucs', uc._id); }}><Trash2 size={16} /></button>
+                                        <div style={{ display: 'flex', gap: '5px' }}>
+                                            <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); handleOpenModal('course', course); }}><Edit2 size={16} /></button>
+                                            <button className="btn-icon-delete" onClick={(e) => { e.stopPropagation(); handleDelete('courses', course._id); }}><Trash2 size={16} /></button>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        </>
-                    ) : (
-                        <div style={{ padding: '40px 20px', textAlign: 'center', color: '#666', background: '#FAFAFA', borderRadius: '8px', border: '1px dashed #DDD', margin: '20px' }}>
-                            <BookOpen size={48} style={{ opacity: 0.2, marginBottom: '15px' }} />
-                            <p style={{ fontSize: '0.9rem' }}>Selecione um curso à esquerda para visualizar e gerenciar suas Unidades Curriculares.</p>
-                        </div>
-                    )}
+
+                                    {isExpanded && (
+                                        <div className="course-body">
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '0 5px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#666' }}>UNIDADES CURRICULARES</span>
+                                                    {ucs.length > 0 && (
+                                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0277BD', background: '#E1F5FE', padding: '2px 8px', borderRadius: '12px', border: '1px solid #B3E5FC' }}>
+                                                            Total: {totalHours}h
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <button className="btn-small-add" onClick={() => handleOpenModal('uc', null, course._id)}>
+                                                    <Plus size={14} /> Nova UC
+                                                </button>
+                                            </div>
+
+                                            {isLoadingUCs ? (
+                                                <div style={{ padding: '10px', textAlign: 'center', color: '#999', fontSize: '0.8rem' }}><Loader2 size={16} className="animate-spin" /> Carregando UCs...</div>
+                                            ) : ucs.length > 0 ? (
+                                                <div className="ucs-list">
+                                                    {ucs.map(uc => (
+                                                        <div key={uc._id} className="uc-item" onClick={() => handleOpenModal('uc', uc, course._id)}>
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{uc.name}</div>
+                                                                <div style={{ fontSize: '0.8rem', color: '#666' }}>{uc.desc}</div>
+                                                            </div>
+                                                            <div className="uc-meta">
+                                                                <span className="badge-hours">{parseInt(String(uc.hours || 0).replace(/\D/g, ''), 10)}h</span>
+                                                                <button className="btn-icon-mini-delete" onClick={(e) => { e.stopPropagation(); handleDelete('ucs', uc._id, course._id); }}>
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div style={{ padding: '15px', textAlign: 'center', color: '#AAA', fontSize: '0.8rem', fontStyle: 'italic', background: '#F5F5F5', borderRadius: '6px' }}>
+                                                    Nenhuma UC cadastrada neste curso.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </SettingsColumn>
 
                 {/* TURMAS */}
-                <SettingsColumn title="Turmas" count={`${classes.length} turmas`} icon={<Users size={20} color="#F57C00" />} iconBg="#FFF3E0">
-                    <div style={{ padding: '0 15px 15px 15px' }}>
-                        <ClassForm
-                            courses={courses}
-                            initialData={editingClass}
-                            onSubmit={(data) => handleCreateOrUpdate('classes', data, editingClass?._id)}
-                            onCancel={() => setEditingClass(null)}
-                        />
-                    </div>
+                <SettingsColumn
+                    title="Turmas"
+                    count={`${classes.length} turmas`}
+                    icon={<Users size={20} color="#F57C00" />}
+                    iconBg="#FFF3E0"
+                    action={<button className="btn-icon-add" onClick={() => handleOpenModal('class')}><Plus size={18} /></button>}
+                >
                     <div className="settings-scroll">
                         {classes.map(cls => (
                             <div
                                 key={cls._id}
-                                className="card-item"
-                                style={{ border: editingClass?._id === cls._id ? '2px solid #F57C00' : '', cursor: 'pointer' }}
-                                onClick={() => setEditingClass(cls)}
+                                className="card-item simple"
+                                onClick={() => handleOpenModal('class', cls)}
                             >
                                 <div style={{ flex: 1 }}>
                                     <div style={{ fontWeight: 700, fontSize: '1rem' }}>{cls.name}</div>
                                     <div style={{ fontSize: '0.8rem', color: '#666' }}>{cls.course?.name || 'Sem curso'}</div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '5px' }}>
-                                    <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); setEditingClass(cls); }}><Edit2 size={16} /></button>
+                                    <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); handleOpenModal('class', cls); }}><Edit2 size={16} /></button>
                                     <button className="btn-icon-delete" onClick={(e) => { e.stopPropagation(); handleDelete('classes', cls._id); }}><Trash2 size={16} /></button>
                                 </div>
                             </div>
@@ -241,40 +277,108 @@ export default function SettingsView({ onBack }) {
                 </SettingsColumn>
 
                 {/* LABORATORIOS */}
-                <SettingsColumn title="Laboratórios" count={`${labs.length} laboratórios`} icon={<Monitor size={20} color="#455A64" />} iconBg="#ECEFF1">
-                    <div style={{ padding: '0 15px 15px 15px' }}>
-                        <LabForm
-                            initialData={editingLab}
-                            onSubmit={(data) => handleCreateOrUpdate('labs', data, editingLab?._id)}
-                            onCancel={() => setEditingLab(null)}
-                        />
-                    </div>
+                <SettingsColumn
+                    title="Laboratórios"
+                    count={`${labs.length} laboratórios`}
+                    icon={<Monitor size={20} color="#455A64" />}
+                    iconBg="#ECEFF1"
+                    action={<button className="btn-icon-add" onClick={() => handleOpenModal('lab')}><Plus size={18} /></button>}
+                >
                     <div className="settings-scroll">
                         {labs.map(lab => (
                             <div
                                 key={lab._id}
-                                className="card-item"
-                                style={{ border: editingLab?._id === lab._id ? '2px solid #455A64' : '', cursor: 'pointer' }}
-                                onClick={() => setEditingLab(lab)}
+                                className="card-item simple"
+                                onClick={() => handleOpenModal('lab', lab)}
                             >
                                 <div style={{ flex: 1 }}>
                                     <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{lab.name}</div>
                                     <div style={{ fontSize: '0.8rem', color: '#666' }}>{lab.capacity}</div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '5px' }}>
-                                    <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); setEditingLab(lab); }}><Edit2 size={16} /></button>
+                                    <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); handleOpenModal('lab', lab); }}><Edit2 size={16} /></button>
                                     <button className="btn-icon-delete" onClick={(e) => { e.stopPropagation(); handleDelete('labs', lab._id); }}><Trash2 size={16} /></button>
                                 </div>
                             </div>
                         ))}
                     </div>
                 </SettingsColumn>
+
+                {/* Administration */}
+                <SettingsColumn title="Administração" count="" icon={<AlertTriangle size={20} color="#D32F2F" />} iconBg="#FFEBEE" action={null}>
+                    <div className="settings-scroll">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                            <div style={{ padding: '15px', background: '#FFEBEE', borderRadius: '8px', border: '1px solid #FFCDD2' }}>
+                                <h4 style={{ margin: '0 0 8px 0', color: '#B71C1C', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Calendar size={16} /> Limpeza de Calendário
+                                </h4>
+                                <p style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: '#C62828' }}>
+                                    Apagar todas as aulas de um mês específico. Ação irreversível.
+                                </p>
+                                <button
+                                    onClick={() => setClearModal({ isOpen: true, year: new Date().getFullYear(), month: new Date().getMonth() })}
+                                    style={{ width: '100%', padding: '8px', background: 'white', border: '1px solid #EF9A9A', borderRadius: '6px', color: '#D32F2F', cursor: 'pointer', fontWeight: 500 }}
+                                >
+                                    Limpar Mês
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </SettingsColumn>
             </div>
+
+            {/* MODAL WRAPPER */}
+            <SettingsFormModal
+                isOpen={modalConfig.isOpen}
+                onClose={handleCloseModal}
+                title={
+                    modalConfig.type === 'course' ? (modalConfig.data ? 'Editar Curso' : 'Novo Curso') :
+                        modalConfig.type === 'uc' ? (modalConfig.data ? 'Editar UC' : 'Nova UC') :
+                            modalConfig.type === 'class' ? (modalConfig.data ? 'Editar Turma' : 'Nova Turma') :
+                                modalConfig.type === 'lab' ? (modalConfig.data ? 'Editar Laboratório' : 'Novo Laboratório') : ''
+                }
+            >
+                {modalConfig.type === 'course' && (
+                    <CourseForm
+                        initialData={modalConfig.data}
+                        onSubmit={(data) => handleCreateOrUpdate('courses', data, modalConfig.data?._id)}
+                        onCancel={handleCloseModal}
+                        isModal
+                    />
+                )}
+                {modalConfig.type === 'uc' && (
+                    <UCForm
+                        courses={courses} // Still pass courses, but maybe pre-select if parentId exists? The form handles it.
+                        initialData={modalConfig.data}
+                        onSubmit={(data) => handleCreateOrUpdate('ucs', data, modalConfig.data?._id)}
+                        onCancel={handleCloseModal}
+                        isModal
+                        defaultCourseId={modalConfig.parentId}
+                    />
+                )}
+                {modalConfig.type === 'class' && (
+                    <ClassForm
+                        courses={courses}
+                        initialData={modalConfig.data}
+                        onSubmit={(data) => handleCreateOrUpdate('classes', data, modalConfig.data?._id)}
+                        onCancel={handleCloseModal}
+                        isModal
+                    />
+                )}
+                {modalConfig.type === 'lab' && (
+                    <LabForm
+                        initialData={modalConfig.data}
+                        onSubmit={(data) => handleCreateOrUpdate('labs', data, modalConfig.data?._id)}
+                        onCancel={handleCloseModal}
+                        isModal
+                    />
+                )}
+            </SettingsFormModal>
 
             <style>{`
                 .settings-grid {
                     display: grid;
-                    grid-template-columns: repeat(4, 1fr);
+                    grid-template-columns: repeat(3, 1fr);
                     gap: 20px;
                     height: calc(100vh - 150px);
                     align-items: stretch;
@@ -292,57 +396,164 @@ export default function SettingsView({ onBack }) {
                 .settings-scroll {
                     flex: 1;
                     overflow-y: auto;
-                    padding: 0 15px 15px 15px;
+                    padding: 15px;
                     display: flex; 
                     flex-direction: column; 
                     gap: 12px;
                 }
-                .card-item { background: white; border: 1px solid #EEE; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02); transition: all 0.2s; }
-                .card-item:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-color: #DDD; }
-                .card-item.selected { background: #F3E5F5; }
-                .btn-icon-delete { color: #EF5350; opacity: 0.7; border-radius: 4px; padding: 4px; transition: all 0.2s; cursor: pointer; background: none; border: none; }
-                .btn-icon-delete:hover { opacity: 1; background: #FFEBEE; }
-                .btn-icon-edit { color: #004587; opacity: 0.7; border-radius: 4px; padding: 4px; transition: all 0.2s; cursor: pointer; background: none; border: none; }
-                .btn-icon-edit:hover { opacity: 1; background: #E3F2FD; }
+                
+                /* Course Card & Accordion */
+                .course-card {
+                    border: 1px solid #E0E0E0;
+                    border-radius: 8px;
+                    background: white;
+                    transition: all 0.2s;
+                    overflow: hidden;
+                }
+                .course-card.expanded {
+                    border-color: #5E35B1;
+                    box-shadow: 0 2px 8px rgba(94, 53, 177, 0.1);
+                }
+                .course-header {
+                    padding: 12px 15px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    cursor: pointer;
+                    background: #FAFAFA;
+                }
+                .course-card.expanded .course-header {
+                    background: #EDE7F6;
+                    border-bottom: 1px solid #D1C4E9;
+                }
+                .course-body {
+                    padding: 15px;
+                    background: white;
+                }
 
-                /* Mobile/Tablet Responsiveness */
-                @media (max-width: 1400px) {
+                /* UC List inside Course */
+                .ucs-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    max-height: 400px;
+                    overflow-y: auto;
+                    padding-right: 4px;
+                }
+                .ucs-list::-webkit-scrollbar { width: 6px; }
+                .ucs-list::-webkit-scrollbar-thumb { background: #E0E0E0; border-radius: 3px; }
+                .ucs-list::-webkit-scrollbar-thumb:hover { background: #BDBDBD; }
+                .uc-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 10px;
+                    border: 1px solid #EEE;
+                    border-radius: 6px;
+                    background: #FFF;
+                    cursor: pointer;
+                    transition: 0.1s;
+                }
+                .uc-item:hover {
+                    border-color: #0277BD;
+                    background: #E1F5FE;
+                }
+                .uc-meta {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+                .badge-hours {
+                    background: #FFF3E0;
+                    color: #F57C00;
+                    font-size: 0.75rem;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-weight: 600;
+                }
+
+                /* Independent Cards (simple) */
+                .card-item.simple {
+                    background: white; 
+                    border: 1px solid #EEE; 
+                    padding: 15px; 
+                    border-radius: 8px; 
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: center; 
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                .card-item.simple:hover {
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                    border-color: #DDD;
+                }
+
+                /* Buttons */
+                .btn-icon-add {
+                    background: #E3F2FD;
+                    color: #0277BD;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 6px;
+                    cursor: pointer;
+                    transition: 0.2s;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .btn-icon-add:hover { background: #BBDEFB; }
+
+                .btn-small-add {
+                    background: none;
+                    border: 1px dashed #0277BD;
+                    color: #0277BD;
+                    font-size: 0.75rem;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    display: flex; align-items: center; gap: 4px;
+                }
+                .btn-small-add:hover { background: #E1F5FE; }
+
+                .btn-icon-edit, .btn-icon-delete, .btn-icon-mini-delete {
+                    background: none; border: none; cursor: pointer; opacity: 0.6; padding: 4px;
+                }
+                .btn-icon-edit:hover { color: #0277BD; opacity: 1; background: #E1F5FE; border-radius: 4px; }
+                .btn-icon-delete:hover { color: #C62828; opacity: 1; background: #FFEBEE; border-radius: 4px; }
+                .btn-icon-mini-delete:hover { color: #C62828; opacity: 1; }
+
+                /* Mobile */
+                @media (max-width: 1200px) {
                     .settings-grid {
                         grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
                         height: auto;
                     }
-                    .settings-column {
-                        height: 600px; /* Fixed height for columns when wrapped to maintain scroll */
-                    }
-                    /* On very small screens, let it flow naturally? No, sticky headers are nice. Keeping fixed height. */
+                    .settings-column { height: 600px; }
                 }
                 @media (max-width: 768px) {
-                     .settings-grid {
-                        grid-template-columns: 1fr;
-                    }
-                    .settings-column {
-                        height: 500px;
-                    }
+                    .settings-grid { grid-template-columns: 1fr; }
+                    .settings-column { height: auto; min-height: 400px; }
                 }
             `}</style>
         </div>
     );
 }
 
-function SettingsColumn({ title, count, icon, iconBg, children }) {
+function SettingsColumn({ title, count, icon, iconBg, action, children }) {
     return (
         <div className="settings-column">
-            <div style={{ padding: '20px', borderBottom: '1px solid #fafafa', display: 'flex', alignItems: 'center', gap: '12px', background: 'white' }}>
-                <div style={{ padding: '8px', borderRadius: '8px', background: iconBg }}>{icon}</div>
-                <div>
-                    <h3 style={{ fontSize: '1rem', color: '#333', margin: 0 }}>{title}</h3>
-                    <span style={{ fontSize: '0.8rem', color: '#888' }}>{count}</span>
+            <div style={{ padding: '15px 20px', borderBottom: '1px solid #fafafa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ padding: '8px', borderRadius: '8px', background: iconBg }}>{icon}</div>
+                    <div>
+                        <h3 style={{ fontSize: '1rem', color: '#333', margin: 0 }}>{title}</h3>
+                        <span style={{ fontSize: '0.8rem', color: '#888' }}>{count}</span>
+                    </div>
                 </div>
+                {action}
             </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: '15px' }}>
-                {children}
-            </div>
+            {children}
         </div>
     );
 }
-

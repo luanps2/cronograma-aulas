@@ -53,12 +53,12 @@ async function processExcelImage(filePath) {
         const base64Image = imageBuffer.toString('base64');
 
         const response = await openai.chat.completions.create({
-            model: "gpt-4o", // Updated to optimized model if available, or gpt-4-turbo
+            model: "gpt-4o",
             messages: [
                 {
                     role: "user",
                     content: [
-                        { type: "text", text: "Analyze this image of a class schedule. Extract lessons with: Date (YYYY-MM-DD), Turma, UC, Period (Manhã/Tarde/Noite), Lab. Return JSON only: { lessons: [] }. Ignore empty rows." },
+                        { type: "text", text: "Analyze this image of a class schedule. Extract lessons strictly following these rules:\n1. Look for a Month/Year header (e.g., 'Março/2026'). If found, apply it to all dates that only have day numbers.\n2. Extract Date as 'YYYY-MM-DD'. Do NOT infer current year/month if not present in the image.\n3. Extract 'Turma' (Class Name), 'UC' (Subject), 'Period' (Manhã/Tarde/Noite), 'Lab' (Laboratory).\n4. Try to identify the 'Course' (Curso) name if visible (e.g., 'Técnico em Informática').\n5. Return JSON: { lessons: [{ date, turma, uc, period, lab, description }] }. Ignore empty or irrelevant rows." },
                         {
                             type: "image_url",
                             image_url: {
@@ -68,7 +68,7 @@ async function processExcelImage(filePath) {
                     ],
                 },
             ],
-            max_tokens: 1500,
+            max_tokens: 2000,
         });
 
         const content = response.choices[0].message.content;

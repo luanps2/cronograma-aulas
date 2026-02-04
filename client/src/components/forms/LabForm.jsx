@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Save, X } from 'lucide-react';
 
-export default function LabForm({ onSubmit, initialData, onCancel }) {
+export default function LabForm({ onSubmit, initialData, onCancel, isModal }) {
     const [name, setName] = useState('');
     const [capacity, setCapacity] = useState('');
 
@@ -27,12 +27,23 @@ export default function LabForm({ onSubmit, initialData, onCancel }) {
         }
     };
 
+    const containerStyle = isModal ? {} : {
+        marginBottom: '0',
+        padding: '15px',
+        background: initialData ? '#ECEFF1' : '#FAFAFA',
+        borderRadius: '8px',
+        border: initialData ? '1px solid #607D8B' : '1px solid #EEE'
+    };
+
     return (
-        <div style={{ marginBottom: '0', padding: '15px', background: initialData ? '#ECEFF1' : '#FAFAFA', borderRadius: '8px', border: initialData ? '1px solid #607D8B' : '1px solid #EEE' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#37474F' }}>{initialData ? 'Editando Lab' : 'Novo Lab'}</h4>
-                {initialData && <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}><X size={16} /></button>}
-            </div>
+        <div style={containerStyle}>
+            {!isModal && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#37474F' }}>{initialData ? 'Editando Lab' : 'Novo Lab'}</h4>
+                    {initialData && <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}><X size={16} /></button>}
+                </div>
+            )}
+
             <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '4px', color: '#555' }}>Nome do Laboratório *</label>
                 <input
@@ -51,9 +62,13 @@ export default function LabForm({ onSubmit, initialData, onCancel }) {
                     onChange={e => setCapacity(e.target.value)}
                 />
             </div>
-            <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', backgroundColor: initialData ? '#455A64' : '' }} onClick={handleSubmit}>
-                {initialData ? <><Save size={16} /> Salvar Alterações</> : <><Plus size={16} /> Adicionar Lab</>}
-            </button>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                {isModal && <button className="btn-outline" style={{ flex: 1 }} onClick={onCancel}>Cancelar</button>}
+                <button className="btn-primary" style={{ flex: 1, justifyContent: 'center', backgroundColor: initialData ? '#455A64' : '' }} onClick={handleSubmit}>
+                    {initialData ? <><Save size={16} /> Salvar</> : <><Plus size={16} /> Criar Lab</>}
+                </button>
+            </div>
         </div>
     );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Save, X } from 'lucide-react';
 
-export default function UCForm({ courses, onSubmit, initialData, onCancel }) {
+export default function UCForm({ courses, onSubmit, initialData, onCancel, isModal, defaultCourseId }) {
     const [courseId, setCourseId] = useState('');
     const [code, setCode] = useState('');
     const [desc, setDesc] = useState('');
@@ -14,12 +14,12 @@ export default function UCForm({ courses, onSubmit, initialData, onCancel }) {
             setDesc(initialData.desc || '');
             setHours(initialData.hours || '');
         } else {
-            setCourseId('');
+            setCourseId(defaultCourseId || '');
             setCode('');
             setDesc('');
             setHours('');
         }
-    }, [initialData]);
+    }, [initialData, defaultCourseId]);
 
     const handleSubmit = () => {
         if (!courseId || !code.trim() || !desc.trim() || !hours.trim()) {
@@ -28,25 +28,37 @@ export default function UCForm({ courses, onSubmit, initialData, onCancel }) {
         }
         onSubmit({ course: courseId, name: code.trim(), desc: desc.trim(), hours: hours.trim() });
         if (!initialData) {
-            setCourseId('');
+            if (!defaultCourseId) setCourseId('');
             setCode('');
             setDesc('');
             setHours('');
         }
     };
 
+    const containerStyle = isModal ? {} : {
+        marginBottom: '0',
+        padding: '15px',
+        background: initialData ? '#E1F5FE' : '#FAFAFA',
+        borderRadius: '8px',
+        border: initialData ? '1px solid #03A9F4' : '1px solid #EEE'
+    };
+
     return (
-        <div style={{ marginBottom: '0', padding: '15px', background: initialData ? '#E1F5FE' : '#FAFAFA', borderRadius: '8px', border: initialData ? '1px solid #03A9F4' : '1px solid #EEE' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#01579B' }}>{initialData ? 'Editando UC' : 'Nova UC'}</h4>
-                {initialData && <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}><X size={16} /></button>}
-            </div>
+        <div style={containerStyle}>
+            {!isModal && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#01579B' }}>{initialData ? 'Editando UC' : 'Nova UC'}</h4>
+                    {initialData && <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}><X size={16} /></button>}
+                </div>
+            )}
+
             <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '4px', color: '#555' }}>Curso *</label>
                 <select
-                    style={{ width: '100%', padding: '8px', border: '1px solid #DDD', borderRadius: '6px', fontSize: '0.9rem', background: 'white' }}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #DDD', borderRadius: '6px', fontSize: '0.9rem', background: (defaultCourseId || initialData) ? '#F5F5F5' : 'white' }}
                     value={courseId}
                     onChange={e => setCourseId(e.target.value)}
+                    disabled={!!defaultCourseId}
                 >
                     <option value="">Selecione um curso</option>
                     {courses.map(c => <option key={c._id || c.id} value={c._id || c.id}>{c.acronym} - {c.name}</option>)}
@@ -79,9 +91,13 @@ export default function UCForm({ courses, onSubmit, initialData, onCancel }) {
                     onChange={e => setHours(e.target.value)}
                 />
             </div>
-            <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', backgroundColor: initialData ? '#0277BD' : '' }} onClick={handleSubmit}>
-                {initialData ? <><Save size={16} /> Salvar Alterações</> : <><Plus size={16} /> Adicionar UC</>}
-            </button>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                {isModal && <button className="btn-outline" style={{ flex: 1 }} onClick={onCancel}>Cancelar</button>}
+                <button className="btn-primary" style={{ flex: 1, justifyContent: 'center', backgroundColor: initialData ? '#0277BD' : '' }} onClick={handleSubmit}>
+                    {initialData ? <><Save size={16} /> Salvar</> : <><Plus size={16} /> Criar UC</>}
+                </button>
+            </div>
         </div>
     );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, FileSpreadsheet, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import axios from 'axios';
+import Modal from './Modal';
 
 export default function ImportModal({ isOpen, onClose, onImportSuccess }) {
     const [dragActive, setDragActive] = useState(false);
@@ -27,8 +28,6 @@ export default function ImportModal({ isOpen, onClose, onImportSuccess }) {
             window.removeEventListener('paste', handlePaste);
         };
     }, [isOpen]);
-
-    if (!isOpen) return null;
 
     const handleDrag = (e) => {
         e.preventDefault();
@@ -57,13 +56,8 @@ export default function ImportModal({ isOpen, onClose, onImportSuccess }) {
     };
 
     const handleFile = (file) => {
-        // Validate file type
-        if (!file.type.match('image.*')) {
-            setError('Por favor, envie uma imagem (PNG, JPEG, WEBP).');
-            return;
-        }
-        if (file.size > 10 * 1024 * 1024) {
-            setError('O arquivo deve ter no máximo 10MB.');
+        if (!file.type.match('image/png') && !file.type.match('image/jpeg') && !file.type.match('image/jpg')) {
+            setError('Por favor, envie apenas imagens (PNG, JPG, JPEG)');
             return;
         }
 
@@ -83,7 +77,6 @@ export default function ImportModal({ isOpen, onClose, onImportSuccess }) {
         formData.append('image', file);
 
         try {
-            // Replace with your actual API endpoint
             const response = await axios.post('http://localhost:5000/api/upload-excel', formData);
 
             setSuccess(true);
@@ -96,109 +89,108 @@ export default function ImportModal({ isOpen, onClose, onImportSuccess }) {
             }, 1500);
 
         } catch (err) {
-            setError('Falha ao processar a imagem. Tente novamente.');
+            setError('Falha aoprocessar a imagem. Tente novamente.');
         } finally {
             setLoading(false);
         }
     };
 
+    const removeFile = () => {
+        setFile(null);
+        setPreview(null);
+        setError(null);
+    };
+
     return (
-        <div className="modal-overlay">
-            <div className="modal">
-                <div style={{ padding: '20px', borderBottom: '1px solid #E0E0E0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h2 style={{ fontSize: '1.25rem', color: '#004587' }}>Importar Planilha</h2>
-                    <button onClick={onClose}><X size={20} color="#666" /></button>
+        <Modal isOpen={isOpen} onClose={onClose} title="Importar Cronograma" maxWidth="600px">
+            <div style={{ padding: '24px' }}>
+                <div style={{ marginBottom: '20px', color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>
+                    <p style={{ marginBottom: '10px' }}>
+                         Cole (Ctrl+V) ou arraste uma imagem do cronograma Excel para importar automaticamente.
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.8 }}>
+                        Formatos aceitos: PNG, JPG, JPEG
+                    </p>
                 </div>
 
-                <div style={{ padding: '30px' }}>
-                    <p style={{ color: '#666', marginBottom: '20px' }}>Envie uma imagem da sua planilha Excel para importação automática</p>
-
+                {!file && (
                     <div
-                        className={`drop-zone ${dragActive ? 'active' : ''}`}
                         onDragEnter={handleDrag}
                         onDragLeave={handleDrag}
                         onDragOver={handleDrag}
                         onDrop={handleDrop}
                         style={{
-                            border: '2px dashed #E0E0E0',
+                            border: `2px dashed ${dragActive ? '#0277BD' : 'var(--border-color)'}`,
                             borderRadius: '12px',
-                            padding: '40px',
+                            padding: '40px 20px',
                             textAlign: 'center',
-                            backgroundColor: dragActive ? '#F5F9FF' : '#FAFAFA',
-                            transition: 'all 0.2s',
-                            cursor: 'pointer',
-                            position: 'relative'
+                            background: dragActive ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
+                            transition: 'all 0.3s',
+                            cursor: 'pointer'
                         }}
-                        onClick={() => document.getElementById('file-upload').click()}
+                        onClick={() => document.getElementById('fileInput').click()}
                     >
+                        <Upload size={48} color="var(--text-tertiary)" style={{ margin: '0 auto 15px' }} />
+                        <p style={{ margin: '10px 0', color: 'var(--text-primary)', fontWeight: 500 }}>
+                            Arraste a imagem ou clique para selecionar
+                        </p>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
+                            Ou use Ctrl+V para colar da �rea de transfer�ncia
+                        </p>
                         <input
-                            id="file-upload"
+                            id="fileInput"
                             type="file"
-                            accept="image/*"
-                            style={{ display: 'none' }}
+                            accept="image/png,image/jpeg,image/jpg"
                             onChange={handleChange}
+                            style={{ display: 'none' }}
                         />
-
-                        {preview ? (
-                            <div style={{ position: 'relative', height: '200px', display: 'flex', justifyContent: 'center' }}>
-                                <img src={preview} alt="Preview" style={{ maxHeight: '100%', maxWidth: '100%', borderRadius: '8px', objectFit: 'contain' }} />
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setFile(null); setPreview(null); }}
-                                    style={{ position: 'absolute', top: -10, right: -10, background: 'white', border: '1px solid #ddd', borderRadius: '50%', padding: '5px' }}
-                                >
-                                    <X size={16} />
-                                </button>
-                            </div>
-                        ) : (
-                            <>
-                                <Upload size={48} color="#999" style={{ marginBottom: '15px' }} />
-                                <h3 style={{ fontSize: '1rem', marginBottom: '5px', color: '#444' }}>Clique para enviar ou arraste e solte</h3>
-                                <p style={{ fontSize: '0.85rem', color: '#888' }}>PNG, JPEG ou WEBP (máx. 10MB)</p>
-                            </>
-                        )}
-                    </div>
-
-                    <div style={{ marginTop: '20px', padding: '15px', background: '#FFF3E0', borderRadius: '8px', border: '1px solid #FFCC80', display: 'flex', gap: '10px' }}>
-                        <div style={{ color: '#F57C00' }}>💡</div>
-                        <div>
-                            <strong style={{ color: '#E65100', display: 'block', marginBottom: '4px' }}>Dica: Pressione Ctrl+V para colar uma imagem</strong>
-                            <span style={{ fontSize: '0.9rem', color: '#555' }}>Tire um print da planilha e cole aqui diretamente!</span>
-                        </div>
-                    </div>
-
-                    {error && (
-                        <div style={{ marginTop: '20px', padding: '10px', background: '#FFEBEE', color: '#C62828', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <AlertCircle size={18} /> {error}
-                        </div>
-                    )}
-
-                    {success && (
-                        <div style={{ marginTop: '20px', padding: '10px', background: '#E8F5E9', color: '#2E7D32', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <CheckCircle size={18} /> Importação concluída com sucesso!
-                        </div>
-                    )}
-
-                    <div style={{ marginTop: '20px', padding: '15px', background: '#E1F5FE', borderRadius: '8px', border: '1px solid #B3E5FC' }}>
-                        <h4 style={{ color: '#0277BD', fontSize: '0.9rem', marginBottom: '10px' }}>Formato esperado da planilha:</h4>
-                        <ul style={{ fontSize: '0.85rem', color: '#01579B', paddingLeft: '20px', lineHeight: '1.5' }}>
-                            <li>Coluna 1: Data (DD/MM/YYYY)</li>
-                            <li>Coluna 2: Dia da semana</li>
-                            <li>Coluna 3 (TARDE): Aulas do período da tarde</li>
-                            <li>Coluna 4 (NOITE): Aulas do período da noite</li>
-                            <li>Células: TURMA – UC – LABORATÓRIO (ex: TI 27 – UC13 – LAB43)</li>
-                        </ul>
-                    </div>
-                </div>
-
-                {file && !success && (
-                    <div style={{ padding: '20px', borderTop: '1px solid #E0E0E0', display: 'flex', justifySelf: 'flex-end', justifyContent: 'flex-end', gap: '10px' }}>
-                        <button className="btn-outline" onClick={onClose}>Cancelar</button>
-                        <button className="btn-primary" onClick={handleUpload} disabled={loading}>
-                            {loading ? <><Loader2 className="animate-spin" size={18} /> Processando...</> : 'Importar Aulas'}
-                        </button>
                     </div>
                 )}
+
+                {preview && (
+                    <div style={{ marginTop: '20px' }}>
+                        <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                            <img src={preview} alt="Preview" style={{ width: '100%', display: 'block' }} />
+                        </div>
+                        <div style={{ marginTop: '15px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <FileSpreadsheet size={20} color="var(--text-tertiary)" />
+                            <span style={{ flex: 1, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{file.name}</span>
+                            <button onClick={removeFile} className="btn-outline" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                                Remover
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {error && (
+                    <div style={{ marginTop: '15px', padding: '12px', background: '#FFEBEE', border: '1px solid #FFCDD2', borderRadius: '8px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <AlertCircle size={20} color="#D32F2F" />
+                        <span style={{ color: '#D32F2F', fontSize: '0.9rem' }}>{error}</span>
+                    </div>
+                )}
+
+                {success && (
+                    <div style={{ marginTop: '15px', padding: '12px', background: '#E8F5E9', border: '1px solid #C8E6C9', borderRadius: '8px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <CheckCircle size={20} color="#4CAF50" />
+                        <span style={{ color: '#4CAF50', fontSize: '0.9rem' }}>Importa��o conclu�da com sucesso!</span>
+                    </div>
+                )}
+
+                <div style={{ marginTop: '25px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <button onClick={onClose} className="btn-outline" disabled={loading}>
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={handleUpload}
+                        className="btn-primary"
+                        disabled={!file || loading || success}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                        {loading && <Loader2 size={18} className="animate-spin" />}
+                        {loading ? 'Processando...' : 'Importar'}
+                    </button>
+                </div>
             </div>
-        </div>
+        </Modal>
     );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Save, X } from 'lucide-react';
 
-export default function ClassForm({ courses, onSubmit, initialData, onCancel }) {
+export default function ClassForm({ courses, onSubmit, initialData, onCancel, isModal }) {
     const [courseId, setCourseId] = useState('');
     const [number, setNumber] = useState('');
 
@@ -34,12 +34,23 @@ export default function ClassForm({ courses, onSubmit, initialData, onCancel }) 
         }
     };
 
+    const containerStyle = isModal ? {} : {
+        marginBottom: '0',
+        padding: '15px',
+        background: initialData ? '#FFF3E0' : '#FAFAFA',
+        borderRadius: '8px',
+        border: initialData ? '1px solid #F57C00' : '1px solid #EEE'
+    };
+
     return (
-        <div style={{ marginBottom: '0', padding: '15px', background: initialData ? '#FFF3E0' : '#FAFAFA', borderRadius: '8px', border: initialData ? '1px solid #F57C00' : '1px solid #EEE' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#E65100' }}>{initialData ? 'Editando Turma' : 'Nova Turma'}</h4>
-                {initialData && <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}><X size={16} /></button>}
-            </div>
+        <div style={containerStyle}>
+            {!isModal && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#E65100' }}>{initialData ? 'Editando Turma' : 'Nova Turma'}</h4>
+                    {initialData && <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}><X size={16} /></button>}
+                </div>
+            )}
+
             <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '4px', color: '#555' }}>Curso *</label>
                 <select
@@ -65,9 +76,13 @@ export default function ClassForm({ courses, onSubmit, initialData, onCancel }) 
                     ✓ Nome gerado: <strong>{previewName}</strong>
                 </div>
             )}
-            <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', backgroundColor: initialData ? '#F57C00' : '' }} onClick={handleSubmit}>
-                {initialData ? <><Save size={16} /> Salvar Alterações</> : <><Plus size={16} /> Adicionar Turma</>}
-            </button>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                {isModal && <button className="btn-outline" style={{ flex: 1 }} onClick={onCancel}>Cancelar</button>}
+                <button className="btn-primary" style={{ flex: 1, justifyContent: 'center', backgroundColor: initialData ? '#F57C00' : '' }} onClick={handleSubmit}>
+                    {initialData ? <><Save size={16} /> Salvar</> : <><Plus size={16} /> Criar Turma</>}
+                </button>
+            </div>
         </div>
     );
 }
