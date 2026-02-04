@@ -12,6 +12,9 @@ db.exec(`
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     name TEXT,
+    avatar_url TEXT,
+    provider TEXT DEFAULT 'local',
+    provider_id TEXT,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -59,5 +62,24 @@ db.exec(`
     FOREIGN KEY (ucId) REFERENCES ucs (id)
   );
 `);
+
+// Migration for existing tables: Add columns if they don't exist
+try {
+  const tableInfo = db.prepare('PRAGMA table_info(users)').all();
+
+  const hasProvider = tableInfo.some(col => col.name === 'provider');
+  if (!hasProvider) {
+    db.prepare('ALTER TABLE users ADD COLUMN provider TEXT DEFAULT "local"').run();
+    db.prepare('ALTER TABLE users ADD COLUMN provider_id TEXT').run();
+  }
+
+  const hasAvatar = tableInfo.some(col => col.name === 'avatar_url');
+  if (!hasAvatar) {
+    db.prepare('ALTER TABLE users ADD COLUMN avatar_url TEXT').run();
+  }
+
+} catch (error) {
+  console.error('Migration error:', error);
+}
 
 module.exports = db;

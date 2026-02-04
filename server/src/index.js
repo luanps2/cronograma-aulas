@@ -7,6 +7,7 @@ const db = require('./database');
 
 const authRoutes = require('./routes/auth');
 const settingsRoutes = require('./routes/settings');
+const authMiddleware = require('./middleware/authMiddleware');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,10 +17,10 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
-app.use('/api/settings', settingsRoutes);
+app.use('/api/settings', authMiddleware, settingsRoutes);
 
 // Routes
-app.get('/api/lessons', (req, res) => {
+app.get('/api/lessons', authMiddleware, (req, res) => {
     try {
         const lessons = db.prepare('SELECT * FROM lessons').all();
         res.json(lessons);
@@ -29,7 +30,7 @@ app.get('/api/lessons', (req, res) => {
     }
 });
 
-app.post('/api/lessons', (req, res) => {
+app.post('/api/lessons', authMiddleware, (req, res) => {
     try {
         const { courseId, turma, ucId, period, lab, date, description } = req.body;
 
@@ -54,6 +55,47 @@ app.post('/api/lessons', (req, res) => {
     }
 });
 
+app.put('/api/lessons/:id', authMiddleware, (req, res) => {
+    try {
+        const { id } = req.params;
+        const { courseId, turma, ucId, period, lab, date, description } = req.body;
+
+        if (!courseId || !ucId) {
+            return res.status(400).json({ error: 'Course and UC are mandatory.' });
+        }
+
+        const uc = db.prepare('SELECT name FROM ucs WHERE id = ? AND courseId = ?').get(ucId, courseId);
+        if (!uc) {
+            return res.status(400).json({ error: 'Inconsistency: Selected UC does not belong to the selected Course.' });
+        }
+
+        db.prepare(
+            'UPDATE lessons SET courseId = ?, turma = ?, ucId = ?, ucName = ?, period = ?, lab = ?, date = ?, description = ? WHERE id = ?'
+        ).run(courseId, turma, ucId, uc.name, period, lab, date, description, id);
+
+        res.json({ id, ...req.body, ucName: uc.name });
+    } catch (error) {
+        console.error('Error updating lesson:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.delete('/api/lessons/:id', authMiddleware, (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = db.prepare('DELETE FROM lessons WHERE id = ?').run(id);
+
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'Lesson not found' });
+        }
+
+        res.json({ message: 'Lesson deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting lesson:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 const { processExcelImage } = require('./services/excelProcessor');
 
 // Import Endpoint
@@ -63,7 +105,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-app.post('/api/upload-excel', upload.single('image'), async (req, res) => {
+app.post('/api/upload-excel', authMiddleware, upload.single('image'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     try {
@@ -97,7 +139,7 @@ app.post('/api/upload-excel', upload.single('image'), async (req, res) => {
         });
     } catch (error) {
         console.error('Upload Error:', error);
-        res.status(500).json({ error: 'Failed to process image' });
+        res.status(500).json({ error: error.message || 'Failed to process image' });
     }
 });
 

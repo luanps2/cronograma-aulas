@@ -123,15 +123,17 @@ export default function SettingsView({ onBack }) {
                 </div>
             </header>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
+            <div className="settings-grid">
                 {/* CURSOS */}
                 <SettingsColumn title="Cursos" count={`${courses.length} cursos`} icon={<GraduationCap size={20} color="#5E35B1" />} iconBg="#EDE7F6">
-                    <CourseForm
-                        initialData={editingCourse}
-                        onSubmit={(data) => handleCreateOrUpdate('courses', data, editingCourse?._id)}
-                        onCancel={() => setEditingCourse(null)}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
+                    <div style={{ padding: '0 15px 15px 15px' }}>
+                        <CourseForm
+                            initialData={editingCourse}
+                            onSubmit={(data) => handleCreateOrUpdate('courses', data, editingCourse?._id)}
+                            onCancel={() => setEditingCourse(null)}
+                        />
+                    </div>
+                    <div className="settings-scroll">
                         {courses.map(course => (
                             <div
                                 key={course._id}
@@ -140,7 +142,7 @@ export default function SettingsView({ onBack }) {
                                     cursor: 'pointer',
                                     border: selectedCourseForUCs?._id === course._id ? '2px solid #5E35B1' : editingCourse?._id === course._id ? '2px solid #5E35B1' : '1px solid #EEE'
                                 }}
-                                onClick={() => setSelectedCourseForUCs(course)}
+                                onClick={() => { setEditingCourse(course); setSelectedCourseForUCs(course); }}
                             >
                                 <div style={{ flex: 1 }}>
                                     <div style={{ fontWeight: 700, color: '#5E35B1', fontSize: '0.95rem', marginBottom: '4px' }}>{course.acronym}</div>
@@ -164,36 +166,43 @@ export default function SettingsView({ onBack }) {
                 >
                     {selectedCourseForUCs ? (
                         <>
-                            <div style={{ padding: '8px 12px', background: '#E3F2FD', borderRadius: '6px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#01579B' }}>
-                                    Curso: {selectedCourseForUCs.acronym}
-                                </span>
-                                <button onClick={() => setSelectedCourseForUCs(null)} style={{ background: 'none', border: 'none', color: '#0277BD', cursor: 'pointer', fontSize: '0.8rem' }}>Trocar</button>
+                            <div style={{ padding: '15px' }}>
+                                <div style={{ padding: '8px 12px', background: '#E3F2FD', borderRadius: '6px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#01579B' }}>
+                                        Curso: {selectedCourseForUCs.acronym}
+                                    </span>
+                                    <button onClick={() => setSelectedCourseForUCs(null)} style={{ background: 'none', border: 'none', color: '#0277BD', cursor: 'pointer', fontSize: '0.8rem' }}>Trocar</button>
+                                </div>
+                                <UCForm
+                                    courses={courses}
+                                    initialData={editingUC}
+                                    onSubmit={(data) => handleCreateOrUpdate('ucs', data, editingUC?._id)}
+                                    onCancel={() => setEditingUC(null)}
+                                />
                             </div>
-                            <UCForm
-                                courses={courses}
-                                initialData={editingUC}
-                                onSubmit={(data) => handleCreateOrUpdate('ucs', data, editingUC?._id)}
-                                onCancel={() => setEditingUC(null)}
-                            />
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
+                            <div className="settings-scroll">
                                 {ucs.map(uc => (
-                                    <div key={uc._id} className="card-item" style={{ display: 'block', border: editingUC?._id === uc._id ? '2px solid #0277BD' : '' }}>
+                                    <div
+                                        key={uc._id}
+                                        className="card-item"
+                                        style={{ display: 'block', border: editingUC?._id === uc._id ? '2px solid #0277BD' : '', cursor: 'pointer' }}
+                                        onClick={() => setEditingUC(uc)}
+                                    >
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                             <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{uc.name}</span>
                                             <span style={{ background: '#FFF3E0', color: '#F57C00', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>{uc.hours}</span>
                                         </div>
                                         <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>{uc.desc}</div>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '5px' }}>
-                                            <button className="btn-icon-edit" onClick={() => setEditingUC(uc)}><Edit2 size={16} /></button>
-                                            <button className="btn-icon-delete" onClick={() => handleDelete('ucs', uc._id)}><Trash2 size={16} /></button>
+                                            <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); setEditingUC(uc); }}><Edit2 size={16} /></button>
+                                            <button className="btn-icon-delete" onClick={(e) => { e.stopPropagation(); handleDelete('ucs', uc._id); }}><Trash2 size={16} /></button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </>
                     ) : (
-                        <div style={{ padding: '40px 20px', textAlign: 'center', color: '#666', background: '#FAFAFA', borderRadius: '8px', border: '1px dashed #DDD' }}>
+                        <div style={{ padding: '40px 20px', textAlign: 'center', color: '#666', background: '#FAFAFA', borderRadius: '8px', border: '1px dashed #DDD', margin: '20px' }}>
                             <BookOpen size={48} style={{ opacity: 0.2, marginBottom: '15px' }} />
                             <p style={{ fontSize: '0.9rem' }}>Selecione um curso à esquerda para visualizar e gerenciar suas Unidades Curriculares.</p>
                         </div>
@@ -202,22 +211,29 @@ export default function SettingsView({ onBack }) {
 
                 {/* TURMAS */}
                 <SettingsColumn title="Turmas" count={`${classes.length} turmas`} icon={<Users size={20} color="#F57C00" />} iconBg="#FFF3E0">
-                    <ClassForm
-                        courses={courses}
-                        initialData={editingClass}
-                        onSubmit={(data) => handleCreateOrUpdate('classes', data, editingClass?._id)}
-                        onCancel={() => setEditingClass(null)}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
+                    <div style={{ padding: '0 15px 15px 15px' }}>
+                        <ClassForm
+                            courses={courses}
+                            initialData={editingClass}
+                            onSubmit={(data) => handleCreateOrUpdate('classes', data, editingClass?._id)}
+                            onCancel={() => setEditingClass(null)}
+                        />
+                    </div>
+                    <div className="settings-scroll">
                         {classes.map(cls => (
-                            <div key={cls._id} className="card-item" style={{ border: editingClass?._id === cls._id ? '2px solid #F57C00' : '' }}>
+                            <div
+                                key={cls._id}
+                                className="card-item"
+                                style={{ border: editingClass?._id === cls._id ? '2px solid #F57C00' : '', cursor: 'pointer' }}
+                                onClick={() => setEditingClass(cls)}
+                            >
                                 <div style={{ flex: 1 }}>
                                     <div style={{ fontWeight: 700, fontSize: '1rem' }}>{cls.name}</div>
                                     <div style={{ fontSize: '0.8rem', color: '#666' }}>{cls.course?.name || 'Sem curso'}</div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '5px' }}>
-                                    <button className="btn-icon-edit" onClick={() => setEditingClass(cls)}><Edit2 size={16} /></button>
-                                    <button className="btn-icon-delete" onClick={() => handleDelete('classes', cls._id)}><Trash2 size={16} /></button>
+                                    <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); setEditingClass(cls); }}><Edit2 size={16} /></button>
+                                    <button className="btn-icon-delete" onClick={(e) => { e.stopPropagation(); handleDelete('classes', cls._id); }}><Trash2 size={16} /></button>
                                 </div>
                             </div>
                         ))}
@@ -226,21 +242,28 @@ export default function SettingsView({ onBack }) {
 
                 {/* LABORATORIOS */}
                 <SettingsColumn title="Laboratórios" count={`${labs.length} laboratórios`} icon={<Monitor size={20} color="#455A64" />} iconBg="#ECEFF1">
-                    <LabForm
-                        initialData={editingLab}
-                        onSubmit={(data) => handleCreateOrUpdate('labs', data, editingLab?._id)}
-                        onCancel={() => setEditingLab(null)}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
+                    <div style={{ padding: '0 15px 15px 15px' }}>
+                        <LabForm
+                            initialData={editingLab}
+                            onSubmit={(data) => handleCreateOrUpdate('labs', data, editingLab?._id)}
+                            onCancel={() => setEditingLab(null)}
+                        />
+                    </div>
+                    <div className="settings-scroll">
                         {labs.map(lab => (
-                            <div key={lab._id} className="card-item" style={{ border: editingLab?._id === lab._id ? '2px solid #455A64' : '' }}>
+                            <div
+                                key={lab._id}
+                                className="card-item"
+                                style={{ border: editingLab?._id === lab._id ? '2px solid #455A64' : '', cursor: 'pointer' }}
+                                onClick={() => setEditingLab(lab)}
+                            >
                                 <div style={{ flex: 1 }}>
                                     <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{lab.name}</div>
                                     <div style={{ fontSize: '0.8rem', color: '#666' }}>{lab.capacity}</div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '5px' }}>
-                                    <button className="btn-icon-edit" onClick={() => setEditingLab(lab)}><Edit2 size={16} /></button>
-                                    <button className="btn-icon-delete" onClick={() => handleDelete('labs', lab._id)}><Trash2 size={16} /></button>
+                                    <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); setEditingLab(lab); }}><Edit2 size={16} /></button>
+                                    <button className="btn-icon-delete" onClick={(e) => { e.stopPropagation(); handleDelete('labs', lab._id); }}><Trash2 size={16} /></button>
                                 </div>
                             </div>
                         ))}
@@ -249,13 +272,58 @@ export default function SettingsView({ onBack }) {
             </div>
 
             <style>{`
+                .settings-grid {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 20px;
+                    height: calc(100vh - 150px);
+                    align-items: stretch;
+                }
+                .settings-column {
+                    background: white;
+                    border: 1px solid #EEE;
+                    border-radius: 12px;
+                    display: flex;
+                    flex-direction: column;
+                    height: 100%;
+                    overflow: hidden;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+                }
+                .settings-scroll {
+                    flex: 1;
+                    overflow-y: auto;
+                    padding: 0 15px 15px 15px;
+                    display: flex; 
+                    flex-direction: column; 
+                    gap: 12px;
+                }
                 .card-item { background: white; border: 1px solid #EEE; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02); transition: all 0.2s; }
-                .card-item:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+                .card-item:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-color: #DDD; }
                 .card-item.selected { background: #F3E5F5; }
                 .btn-icon-delete { color: #EF5350; opacity: 0.7; border-radius: 4px; padding: 4px; transition: all 0.2s; cursor: pointer; background: none; border: none; }
                 .btn-icon-delete:hover { opacity: 1; background: #FFEBEE; }
                 .btn-icon-edit { color: #004587; opacity: 0.7; border-radius: 4px; padding: 4px; transition: all 0.2s; cursor: pointer; background: none; border: none; }
                 .btn-icon-edit:hover { opacity: 1; background: #E3F2FD; }
+
+                /* Mobile/Tablet Responsiveness */
+                @media (max-width: 1400px) {
+                    .settings-grid {
+                        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                        height: auto;
+                    }
+                    .settings-column {
+                        height: 600px; /* Fixed height for columns when wrapped to maintain scroll */
+                    }
+                    /* On very small screens, let it flow naturally? No, sticky headers are nice. Keeping fixed height. */
+                }
+                @media (max-width: 768px) {
+                     .settings-grid {
+                        grid-template-columns: 1fr;
+                    }
+                    .settings-column {
+                        height: 500px;
+                    }
+                }
             `}</style>
         </div>
     );
@@ -263,15 +331,17 @@ export default function SettingsView({ onBack }) {
 
 function SettingsColumn({ title, count, icon, iconBg, children }) {
     return (
-        <div className="card" style={{ padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 'fit-content' }}>
-            <div style={{ padding: '20px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="settings-column">
+            <div style={{ padding: '20px', borderBottom: '1px solid #fafafa', display: 'flex', alignItems: 'center', gap: '12px', background: 'white' }}>
                 <div style={{ padding: '8px', borderRadius: '8px', background: iconBg }}>{icon}</div>
                 <div>
-                    <h3 style={{ fontSize: '1rem', color: '#333' }}>{title}</h3>
+                    <h3 style={{ fontSize: '1rem', color: '#333', margin: 0 }}>{title}</h3>
                     <span style={{ fontSize: '0.8rem', color: '#888' }}>{count}</span>
                 </div>
             </div>
-            <div style={{ padding: '20px', background: '#FDFDFD', flex: 1 }}>{children}</div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: '15px' }}>
+                {children}
+            </div>
         </div>
     );
 }

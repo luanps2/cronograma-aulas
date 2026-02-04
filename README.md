@@ -30,7 +30,15 @@ npm install
 
 # Inicie o servidor
 npm start
+
+#Buscar process rodando na porta do server
+netstat -ano | findstr :5000
+
+# Parar servidor manualmente
+taskkill /PID 15220 /F
 ```
+
+
 
 O servidor iniciará na porta **5000**.
 Você verá a mensagem: `'Server running on http://localhost:5000'` e `'MongoDB Linked'` (se o banco estiver rodando).

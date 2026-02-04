@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Trash2 } from 'lucide-react';
 import axios from 'axios';
+import ConfirmModal from './ConfirmModal';
 
-export default function NewLessonModal({ isOpen, onClose, onSave, initialDate }) {
+export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, lesson }) {
+    const isEditing = !!lesson;
+
     const [formData, setFormData] = useState({
         courseId: '',
         ucId: '',
@@ -18,21 +21,36 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate })
     const [classes, setClasses] = useState([]);
     const [labs, setLabs] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: null });
 
     useEffect(() => {
         if (isOpen) {
-            setFormData({
-                courseId: '',
-                ucId: '',
-                turma: '',
-                lab: '',
-                period: '',
-                description: '',
-                date: initialDate || new Date()
-            });
+            // Reset or Load Lesson
+            if (isEditing && lesson) {
+                setFormData({
+                    courseId: lesson.courseId,
+                    ucId: lesson.ucId,
+                    turma: lesson.turma,
+                    lab: lesson.lab,
+                    period: lesson.period,
+                    description: lesson.description || '',
+                    date: lesson.date ? new Date(lesson.date) : new Date()
+                });
+            } else {
+                setFormData({
+                    courseId: '',
+                    ucId: '',
+                    turma: '',
+                    lab: '',
+                    period: '',
+                    description: '',
+                    date: initialDate || new Date()
+                });
+            }
             fetchInitialData();
         }
-    }, [isOpen, initialDate]);
+    }, [isOpen, initialDate, lesson]);
 
     // Fetch UCs whenever course changes
     useEffect(() => {
@@ -40,7 +58,9 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate })
             fetchUCsByCourse(formData.courseId);
         } else {
             setUcs([]);
-            setFormData(prev => ({ ...prev, ucId: '' }));
+            if (!isEditing) { // Only clear if not initial edit load
+                setFormData(prev => ({ ...prev, ucId: '' }));
+            }
         }
     }, [formData.courseId]);
 
@@ -77,19 +97,66 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate })
 
     const handleSave = async () => {
         if (!formData.courseId || !formData.ucId || !formData.turma || !formData.lab || !formData.period) {
-            alert('Por favor, preencha todos os campos obrigatórios (*)');
+            setConfirmModal({
+                isOpen: true,
+                type: 'error',
+                title: 'Campos Obrigatórios',
+                message: 'Por favor, preencha todos os campos obrigatórios (*)',
+                confirmText: 'Entendi'
+            });
             return;
         }
 
+        setSaving(true);
         try {
-            const response = await axios.post('http://localhost:5000/api/lessons', formData);
-            if (response.status === 201) {
-                onSave();
-                onClose();
+            if (isEditing) {
+                await axios.put(`http://localhost:5000/api/lessons/${lesson.id}`, formData);
+            } else {
+                await axios.post('http://localhost:5000/api/lessons', formData);
             }
+            onSave();
+            onClose();
         } catch (error) {
-            const message = error.response?.data?.error || 'Erro ao criar aula';
-            alert(message);
+            const message = error.response?.data?.error || 'Erro ao salvar aula';
+            setConfirmModal({
+                isOpen: true,
+                type: 'error',
+                title: 'Erro ao Salvar',
+                message: message,
+                confirmText: 'Fechar'
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteClick = () => {
+        setConfirmModal({
+            isOpen: true,
+            type: 'confirm',
+            title: 'Excluir Aula',
+            message: 'Tem certeza que deseja excluir esta aula? Esta ação não pode ser desfeita.',
+            confirmText: 'Excluir',
+            onConfirm: executeDelete
+        });
+    };
+
+    const executeDelete = async () => {
+        setSaving(true);
+        try {
+            await axios.delete(`http://localhost:5000/api/lessons/${lesson.id}`);
+            onSave();
+            onClose();
+        } catch (error) {
+            setConfirmModal({
+                isOpen: true,
+                type: 'error',
+                title: 'Erro ao Excluir',
+                message: 'Não foi possível excluir a aula. Tente novamente.',
+                confirmText: 'Fechar'
+            });
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -100,9 +167,13 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate })
             <div className="modal" style={{ maxWidth: '540px', width: '90%' }}>
                 <div style={{ padding: '20px', borderBottom: '1px solid #E0E0E0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h2 style={{ fontSize: '1.25rem', color: '#1A1A1A', margin: 0 }}>Nova Aula</h2>
+                        <h2 style={{ fontSize: '1.25rem', color: '#1A1A1A', margin: 0 }}>
+                            {isEditing ? 'Editar Aula' : 'Nova Aula'}
+                        </h2>
                         <span style={{ fontSize: '0.9rem', color: '#666' }}>
-                            {formData.date.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            {(formData.date instanceof Date && !isNaN(formData.date))
+                                ? formData.date.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                                : 'Data Inválida'}
                         </span>
                     </div>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#666" /></button>
@@ -205,13 +276,30 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate })
                     )}
                 </div>
 
-                <div style={{ padding: '20px', borderTop: '1px solid #E0E0E0', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: '#FAFAFA', borderRadius: '0 0 12px 12px' }}>
-                    <button className="btn-outline" style={{ background: 'white' }} onClick={onClose} disabled={loading}>Cancelar</button>
-                    <button className="btn-primary" onClick={handleSave} disabled={loading}>
-                        {loading ? 'Processando...' : 'Criar Aula'}
-                    </button>
+                <div style={{ padding: '20px', borderTop: '1px solid #E0E0E0', display: 'flex', justifyContent: isEditing ? 'space-between' : 'flex-end', gap: '10px', background: '#FAFAFA', borderRadius: '0 0 12px 12px' }}>
+                    {isEditing && (
+                        <button onClick={handleDeleteClick} className="btn-outline" style={{ color: '#D32F2F', borderColor: '#FFCDD2', background: '#FFEBEE' }}>
+                            <Trash2 size={18} /> Excluir
+                        </button>
+                    )}
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button className="btn-outline" style={{ background: 'white' }} onClick={onClose} disabled={saving}>Cancelar</button>
+                        <button className="btn-primary" onClick={handleSave} disabled={saving}>
+                            {saving ? 'Salvando...' : (isEditing ? 'Atualizar Aula' : 'Criar Aula')}
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                type={confirmModal.type}
+                confirmText={confirmModal.confirmText}
+                onConfirm={confirmModal.onConfirm}
+            />
         </div>
     );
 }
