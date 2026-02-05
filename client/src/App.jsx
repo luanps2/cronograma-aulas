@@ -228,7 +228,7 @@ function App() {
         <Layout user={user} onLogout={handleLogout} onNavigateHome={() => setCurrentView('calendar')}>
 
             {currentView === 'settings' ? (
-                <SettingsView onBack={() => setCurrentView('calendar')} />
+                <SettingsView onBack={() => setCurrentView('calendar')} onRefresh={fetchLessons} />
             ) : (
                 <>
                     {/* Action Bar (Sub-header) */}

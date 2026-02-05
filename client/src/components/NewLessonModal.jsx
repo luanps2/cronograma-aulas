@@ -56,9 +56,9 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
         setLoading(true);
         try {
             const [coursesRes, classesRes, labsRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/courses'),
-                axios.get('http://localhost:5000/api/classes'),
-                axios.get('http://localhost:5000/api/labs')
+                axios.get('http://localhost:5000/api/settings/courses'),
+                axios.get('http://localhost:5000/api/settings/classes'),
+                axios.get('http://localhost:5000/api/settings/labs')
             ]);
             setCourses(coursesRes.data);
             setClasses(classesRes.data);
@@ -72,7 +72,7 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
 
     useEffect(() => {
         if (formData.courseId) {
-            axios.get(`http://localhost:5000/api/ucs?courseId=${formData.courseId}`)
+            axios.get(`http://localhost:5000/api/settings/courses/${formData.courseId}/ucs`)
                 .then(res => setUcs(res.data))
                 .catch(err => console.error(err));
         } else {

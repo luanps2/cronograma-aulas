@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Trash2, Plus, GraduationCap, Users, BookOpen, Monitor, Loader2, Edit2, ChevronDown, ChevronRight, Calendar, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
+import Modal from './Modal';
 import CourseForm from './forms/CourseForm';
 import ClassForm from './forms/ClassForm';
 import UCForm from './forms/UCForm';
 import LabForm from './forms/LabForm';
 import SettingsFormModal from './SettingsFormModal';
+import ConfirmModal from './ConfirmModal';
 
-export default function SettingsView({ onBack }) {
+export default function SettingsView({ onBack, onRefresh }) {
     const [courses, setCourses] = useState([]);
     const [classes, setClasses] = useState([]);
     const [labs, setLabs] = useState([]);
@@ -28,6 +30,7 @@ export default function SettingsView({ onBack }) {
     });
 
     // Clear Month State
+    const [selectionModal, setSelectionModal] = useState({ isOpen: false, year: new Date().getFullYear(), month: new Date().getMonth() });
     const [clearModal, setClearModal] = useState({ isOpen: false, year: new Date().getFullYear(), month: new Date().getMonth() });
     const [clearing, setClearing] = useState(false);
 
@@ -127,19 +130,37 @@ export default function SettingsView({ onBack }) {
         }
     };
 
-    const handleClearMonth = async () => {
-        if (!confirm(`ATENÇÃO: Isso apagará TODAS as aulas de ${clearModal.month + 1}/${clearModal.year}. Confirmar?`)) return;
+    const handleOpenClearSelection = () => {
+        setSelectionModal({
+            isOpen: true,
+            year: new Date().getFullYear(),
+            month: new Date().getMonth()
+        });
+    };
 
+    const handleProceedToConfirm = () => {
+        setSelectionModal({ ...selectionModal, isOpen: false });
+        setClearModal({
+            isOpen: true,
+            year: selectionModal.year,
+            month: selectionModal.month
+        });
+    };
+
+    const handleClearMonth = async () => {
         setClearing(true);
         try {
-            const res = await axios.delete('http://localhost:5000/api/lessons/clear-month', {
+            const res = await axios.delete('http://localhost:5000/api/admin/clear-month', {
                 data: { year: clearModal.year, month: clearModal.month + 1 } // API expects 1-based month
             });
             alert(res.data.message || 'Calendário limpo com sucesso.');
             setClearModal({ ...clearModal, isOpen: false });
+            if (onRefresh) onRefresh();
+            if (onBack) onBack();
         } catch (error) {
             console.error('Error clearing month:', error);
-            alert('Erro ao limpar calendário.');
+            const msg = error.response?.data?.error || error.message || 'Erro desconhecido';
+            alert(`Erro ao limpar calendário: ${msg}`);
         } finally {
             setClearing(false);
         }
@@ -316,7 +337,7 @@ export default function SettingsView({ onBack }) {
                                     Apagar todas as aulas de um mês específico. Ação irreversível.
                                 </p>
                                 <button
-                                    onClick={() => setClearModal({ isOpen: true, year: new Date().getFullYear(), month: new Date().getMonth() })}
+                                    onClick={handleOpenClearSelection}
                                     style={{ width: '100%', padding: '8px', background: 'white', border: '1px solid #EF9A9A', borderRadius: '6px', color: '#D32F2F', cursor: 'pointer', fontWeight: 500 }}
                                 >
                                     Limpar Mês
@@ -326,6 +347,60 @@ export default function SettingsView({ onBack }) {
                     </div>
                 </SettingsColumn>
             </div>
+
+            {/* SELECTION MODAL FOR CLEARING */}
+            <Modal
+                isOpen={selectionModal.isOpen}
+                onClose={() => setSelectionModal({ ...selectionModal, isOpen: false })}
+                title="Selecionar Período"
+                maxWidth="400px"
+            >
+                <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ display: 'flex', gap: '15px' }}>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>Mês</label>
+                            <select
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #DDD' }}
+                                value={selectionModal.month}
+                                onChange={(e) => setSelectionModal({ ...selectionModal, month: parseInt(e.target.value) })}
+                            >
+                                {Array.from({ length: 12 }, (_, i) => (
+                                    <option key={i} value={i}>
+                                        {new Date(0, i).toLocaleString('pt-BR', { month: 'long' })}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>Ano</label>
+                            <select
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #DDD' }}
+                                value={selectionModal.year}
+                                onChange={(e) => setSelectionModal({ ...selectionModal, year: parseInt(e.target.value) })}
+                            >
+                                {[new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1, new Date().getFullYear() + 2].map(y => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                        <button
+                            className="btn-outline"
+                            onClick={() => setSelectionModal({ ...selectionModal, isOpen: false })}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className="btn-primary"
+                            onClick={handleProceedToConfirm}
+                            style={{ background: '#D32F2F', borderColor: '#D32F2F' }}
+                        >
+                            Continuar
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* MODAL WRAPPER */}
             <SettingsFormModal
@@ -374,6 +449,16 @@ export default function SettingsView({ onBack }) {
                     />
                 )}
             </SettingsFormModal>
+
+            <ConfirmModal
+                isOpen={clearModal.isOpen}
+                onClose={() => setClearModal({ ...clearModal, isOpen: false })}
+                title="Limpar Calendário"
+                message={`ATENÇÃO: Você está prestes a excluir TODAS as aulas de ${new Date(0, clearModal.month).toLocaleString('pt-BR', { month: 'long' })}/${clearModal.year}. Esta ação não pode ser desfeita. Deseja continuar?`}
+                type="delete"
+                confirmText={clearing ? "Limpando..." : "Confirmar Limpeza"}
+                onConfirm={handleClearMonth}
+            />
 
             <style>{`
                 .settings-grid {

@@ -247,7 +247,7 @@ app.post('/api/upload-excel', authMiddleware, upload.single('image'), async (req
 });
 
 // Admin: Clear Month Endpoint
-app.delete('/api/lessons/clear-month', authMiddleware, (req, res) => {
+app.delete('/api/admin/clear-month', authMiddleware, (req, res) => {
     try {
         const { year, month } = req.body; // Expects numbers: year=2026, month=3 (1-12) or month=2 (0-11)? Let's assume 1-based index like 2026-03
 
