@@ -13,6 +13,7 @@ import Layout from './Layout';
 export default function Dashboard() {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -24,6 +25,7 @@ export default function Dashboard() {
                 setStats(res.data);
             } catch (error) {
                 console.error("Error fetching dashboard stats", error);
+                setError("Não foi possível carregar os dados do painel. Tente novamente mais tarde.");
             } finally {
                 setLoading(false);
             }
@@ -35,11 +37,39 @@ export default function Dashboard() {
     if (loading) {
         return (
             <Layout>
-                <div style={{ padding: '20px', color: 'var(--text-primary)' }}>Carregando dashboard...</div>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-primary)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                        <div className="animate-spin" style={{ width: '30px', height: '30px', border: '3px solid var(--text-tertiary)', borderTop: '3px solid var(--text-primary)', borderRadius: '50%' }}></div>
+                        <span>Carregando estatísticas...</span>
+                    </div>
+                </div>
             </Layout>
         );
     }
 
+    if (error) {
+        return (
+            <Layout>
+                <div style={{ padding: '24px', maxWidth: '1600px', margin: '0 auto', color: 'var(--text-primary)', textAlign: 'center' }}>
+                    <h1 style={{ marginBottom: '24px' }}>Dashboard Acadêmico</h1>
+                    <div style={{ padding: '40px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <Activity size={48} color="var(--text-tertiary)" style={{ marginBottom: '20px' }} />
+                        <h3 style={{ marginBottom: '10px' }}>Ops, algo deu errado</h3>
+                        <p style={{ color: 'var(--text-secondary)' }}>{error}</p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="btn-primary"
+                            style={{ marginTop: '20px' }}
+                        >
+                            Tentar novamente
+                        </button>
+                    </div>
+                </div>
+            </Layout>
+        );
+    }
+
+    // Fallback if stats is null but no error (rare edge case)
     if (!stats) return null;
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];

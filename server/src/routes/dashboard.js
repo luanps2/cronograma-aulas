@@ -52,12 +52,11 @@ router.get('/stats', async (req, res) => {
 
         // 3. Recent Activity
         const recentActivity = (await db.query(`
-            SELECT id, date, turma, ucName, description, created_at
+            SELECT id, date, turma, ucName, description
             FROM lessons
             ORDER BY id DESC
             LIMIT 5
-        `)).rows; // created_at might not exist in lessons schema, using ID as proxy for now if not available or check schema first. 
-        // Based on previous conversations, schema might be simple. Let's assume ID DESC is good proxy for "recent".
+        `)).rows;
 
         res.json({
             kpis: {
