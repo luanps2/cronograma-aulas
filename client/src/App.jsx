@@ -92,7 +92,7 @@ function App() {
     // Loading State
     if (isAuthLoading) {
         return (
-            <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5F7FA' }}>
+            <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-tertiary)' }}>
                 <div className="animate-spin" style={{
                     width: '40px',
                     height: '40px',
@@ -239,8 +239,8 @@ function App() {
                         <button className="btn-outline" onClick={() => setCurrentView('settings')}>
                             <Settings size={18} /> <span className="hide-mobile">Configurações</span>
                         </button>
-                        <button className="btn-primary" onClick={handleNewLesson}>
-                            <Plus size={18} /> <span className="hide-mobile">Nova Aula</span>
+                        <button className="btn-outline" onClick={() => window.location.href = '/dashboard'}>
+                            <LayoutGrid size={18} /> <span className="hide-mobile">Dashboard</span>
                         </button>
                     </div>
 
@@ -250,7 +250,6 @@ function App() {
                         <select style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}><option>Todas as UCs</option></select>
 
                         <div style={{ flex: 1 }}></div>
-
                         <div style={{ display: 'flex', gap: '0', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
                             <button
                                 onClick={() => setCalendarViewMode('grid')}
@@ -395,16 +394,16 @@ function LessonCard({ lesson, horizontal, onClick }) {
                 <div style={{ flex: 1, minWidth: '150px', fontWeight: '500', color: 'var(--text-secondary)' }}>{lesson.uc}</div>
 
                 {/* 4. Lab */}
-                <div style={{ fontWeight: '600', color: '#555', fontSize: '0.85rem' }}>{lesson.lab}</div>
+                <div style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{lesson.lab}</div>
 
                 {/* 5. Description */}
                 {lesson.description && (
                     <div style={{
                         fontSize: '0.85rem',
-                        color: 'var(--text-tertiary, #666)',
+                        color: 'var(--text-tertiary)',
                         width: '100%',
                         marginTop: '4px',
-                        borderTop: '1px solid rgba(0,0,0,0.05)',
+                        borderTop: '1px solid var(--border-color)',
                         paddingTop: '4px'
                     }}>
                         {lesson.description}
@@ -455,12 +454,13 @@ function LessonCard({ lesson, horizontal, onClick }) {
             {/* 5. Description */}
             {lesson.description && (
                 <div style={{
+                    width: '100%',
                     fontSize: '0.7rem',
                     opacity: 0.8,
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    borderTop: '1px solid rgba(255,255,255,0.2)',
+                    borderTop: '1px solid var(--border-color)',
                     marginTop: '2px',
                     paddingTop: '2px'
                 }}>

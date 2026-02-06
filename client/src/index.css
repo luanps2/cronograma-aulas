@@ -20,18 +20,22 @@
 }
 
 [data-theme='dark'] {
-  --bg-primary: #1a1a1a;
+  --bg-primary: #1E1E1E;
+  /* Surface (Cards, Calendar) */
   --bg-secondary: #252525;
-  --bg-tertiary: #2a2a2a;
-  --text-primary: #e8e8e8;
-  --text-secondary: #64b5f6;
-  --text-tertiary: #a0a0a0;
-  --border-color: #3a3a3a;
-  --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+  /* Headers, Accents */
+  --bg-tertiary: #121212;
+  /* Main Background */
+  --text-primary: #E0E0E0;
+  --text-secondary: #B0B0B0;
+  --text-tertiary: #888888;
+  --border-color: #333333;
+  --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
 }
 
 html {
   background-color: var(--bg-tertiary);
+  min-height: 100%;
 }
 
 body {
@@ -46,6 +50,8 @@ body {
 #root {
   min-height: 100vh;
   background-color: var(--bg-tertiary);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Applying vars to common elements */

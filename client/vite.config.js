@@ -8,6 +8,10 @@ export default defineConfig({
         react(),
         VitePWA({
             registerType: 'autoUpdate',
+            injectRegister: 'auto',
+            devOptions: {
+                enabled: true
+            },
             manifest: {
                 name: 'Planejamento Acadêmico Senac',
                 short_name: 'Senac Plan',

@@ -176,9 +176,9 @@ export default function SettingsView({ onBack, onRefresh }) {
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                     <img src="/senac-logo.png" alt="Senac" style={{ height: '40px' }} />
-                    <div style={{ borderLeft: '1px solid #ddd', paddingLeft: '15px' }}>
-                        <h1 style={{ fontSize: '20px', color: '#004587', margin: 0 }}>Configurações</h1>
-                        <span style={{ fontSize: '14px', color: '#666' }}>Gerencie a estrutura hierárquica do SENAC</span>
+                    <div style={{ borderLeft: '1px solid var(--border-color)', paddingLeft: '15px' }}>
+                        <h1 style={{ fontSize: '20px', color: 'var(--text-primary)', margin: 0 }}>Configurações</h1>
+                        <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>Gerencie a estrutura hierárquica do SENAC</span>
                     </div>
                 </div>
             </header>
@@ -211,9 +211,9 @@ export default function SettingsView({ onBack, onRefresh }) {
                                         onClick={() => handleToggleCourse(course._id)}
                                     >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                                            {isExpanded ? <ChevronDown size={18} color="#5E35B1" /> : <ChevronRight size={18} color="#666" />}
-                                            <div style={{ fontWeight: 700, color: '#5E35B1', fontSize: '0.95rem' }}>{course.acronym}</div>
-                                            <div style={{ fontSize: '0.85rem', color: '#333' }}>- {course.name}</div>
+                                            {isExpanded ? <ChevronDown size={18} color="var(--text-secondary)" /> : <ChevronRight size={18} color="var(--text-tertiary)" />}
+                                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.95rem' }}>{course.acronym}</div>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>- {course.name}</div>
                                         </div>
                                         <div style={{ display: 'flex', gap: '5px' }}>
                                             <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); handleOpenModal('course', course); }}><Edit2 size={16} /></button>
@@ -225,7 +225,7 @@ export default function SettingsView({ onBack, onRefresh }) {
                                         <div className="course-body">
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '0 5px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#666' }}>UNIDADES CURRICULARES</span>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-tertiary)' }}>UNIDADES CURRICULARES</span>
                                                     {ucs.length > 0 && (
                                                         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0277BD', background: '#E1F5FE', padding: '2px 8px', borderRadius: '12px', border: '1px solid #B3E5FC' }}>
                                                             Total: {totalHours}h
@@ -244,8 +244,8 @@ export default function SettingsView({ onBack, onRefresh }) {
                                                     {ucs.map(uc => (
                                                         <div key={uc._id} className="uc-item" onClick={() => handleOpenModal('uc', uc, course._id)}>
                                                             <div style={{ flex: 1 }}>
-                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{uc.name}</div>
-                                                                <div style={{ fontSize: '0.8rem', color: '#666' }}>{uc.desc}</div>
+                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{uc.name}</div>
+                                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{uc.desc}</div>
                                                             </div>
                                                             <div className="uc-meta">
                                                                 <span className="badge-hours">{parseInt(String(uc.hours || 0).replace(/\D/g, ''), 10)}h</span>
@@ -285,8 +285,8 @@ export default function SettingsView({ onBack, onRefresh }) {
                                 onClick={() => handleOpenModal('class', cls)}
                             >
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{cls.name}</div>
-                                    <div style={{ fontSize: '0.8rem', color: '#666' }}>{cls.course?.name || 'Sem curso'}</div>
+                                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>{cls.name}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{cls.course?.name || 'Sem curso'}</div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '5px' }}>
                                     <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); handleOpenModal('class', cls); }}><Edit2 size={16} /></button>
@@ -313,8 +313,8 @@ export default function SettingsView({ onBack, onRefresh }) {
                                 onClick={() => handleOpenModal('lab', lab)}
                             >
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{lab.name}</div>
-                                    <div style={{ fontSize: '0.8rem', color: '#666' }}>{lab.capacity}</div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{lab.name}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{lab.capacity}</div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '5px' }}>
                                     <button className="btn-icon-edit" onClick={(e) => { e.stopPropagation(); handleOpenModal('lab', lab); }}><Edit2 size={16} /></button>
@@ -469,14 +469,14 @@ export default function SettingsView({ onBack, onRefresh }) {
                     align-items: stretch;
                 }
                 .settings-column {
-                    background: white;
-                    border: 1px solid #EEE;
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border-color);
                     border-radius: 12px;
                     display: flex;
                     flex-direction: column;
                     height: 100%;
                     overflow: hidden;
-                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+                    box-shadow: var(--card-shadow);
                 }
                 .settings-scroll {
                     flex: 1;
@@ -489,9 +489,9 @@ export default function SettingsView({ onBack, onRefresh }) {
                 
                 /* Course Card & Accordion */
                 .course-card {
-                    border: 1px solid #E0E0E0;
+                    border: 1px solid var(--border-color);
                     border-radius: 8px;
-                    background: white;
+                    background: var(--bg-primary);
                     transition: all 0.2s;
                     overflow: hidden;
                 }
@@ -505,15 +505,15 @@ export default function SettingsView({ onBack, onRefresh }) {
                     align-items: center;
                     justify-content: space-between;
                     cursor: pointer;
-                    background: #FAFAFA;
+                    background: var(--bg-secondary);
                 }
                 .course-card.expanded .course-header {
-                    background: #EDE7F6;
-                    border-bottom: 1px solid #D1C4E9;
+                    background: var(--bg-secondary);
+                    border-bottom: 1px solid var(--border-color);
                 }
                 .course-body {
                     padding: 15px;
-                    background: white;
+                    background: var(--bg-primary);
                 }
 
                 /* UC List inside Course */
@@ -533,9 +533,9 @@ export default function SettingsView({ onBack, onRefresh }) {
                     justify-content: space-between;
                     align-items: center;
                     padding: 10px;
-                    border: 1px solid #EEE;
+                    border: 1px solid var(--border-color);
                     border-radius: 6px;
-                    background: #FFF;
+                    background: var(--bg-primary);
                     cursor: pointer;
                     transition: 0.1s;
                 }
@@ -559,8 +559,8 @@ export default function SettingsView({ onBack, onRefresh }) {
 
                 /* Independent Cards (simple) */
                 .card-item.simple {
-                    background: white; 
-                    border: 1px solid #EEE; 
+                    background: var(--bg-primary); 
+                    border: 1px solid var(--border-color); 
                     padding: 15px; 
                     border-radius: 8px; 
                     display: flex; 
@@ -602,11 +602,15 @@ export default function SettingsView({ onBack, onRefresh }) {
                 .btn-small-add:hover { background: #E1F5FE; }
 
                 .btn-icon-edit, .btn-icon-delete, .btn-icon-mini-delete {
-                    background: none; border: none; cursor: pointer; opacity: 0.6; padding: 4px;
+                    background: none; border: none; cursor: pointer; opacity: 1; padding: 4px;
                 }
-                .btn-icon-edit:hover { color: #0277BD; opacity: 1; background: #E1F5FE; border-radius: 4px; }
-                .btn-icon-delete:hover { color: #C62828; opacity: 1; background: #FFEBEE; border-radius: 4px; }
-                .btn-icon-mini-delete:hover { color: #C62828; opacity: 1; }
+                .btn-icon-edit { color: var(--text-tertiary); }
+                .btn-icon-delete { color: var(--text-tertiary); }
+                .btn-icon-mini-delete { color: var(--text-tertiary); }
+
+                .btn-icon-edit:hover { color: #0277BD; background: var(--bg-secondary); border-radius: 4px; }
+                .btn-icon-delete:hover { color: #C62828; background: #FFEBEE; border-radius: 4px; }
+                .btn-icon-mini-delete:hover { color: #C62828; }
 
                 /* Mobile */
                 @media (max-width: 1200px) {
@@ -628,12 +632,12 @@ export default function SettingsView({ onBack, onRefresh }) {
 function SettingsColumn({ title, count, icon, iconBg, action, children }) {
     return (
         <div className="settings-column">
-            <div style={{ padding: '15px 20px', borderBottom: '1px solid #fafafa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white' }}>
+            <div style={{ padding: '15px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-primary)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ padding: '8px', borderRadius: '8px', background: iconBg }}>{icon}</div>
                     <div>
-                        <h3 style={{ fontSize: '1rem', color: '#333', margin: 0 }}>{title}</h3>
-                        <span style={{ fontSize: '0.8rem', color: '#888' }}>{count}</span>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--text-primary)', margin: 0 }}>{title}</h3>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>{count}</span>
                     </div>
                 </div>
                 {action}

@@ -101,8 +101,8 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                 date: formData.date.toISOString()
             };
 
-            if (isEditing && lesson?._id) {
-                await axios.put(`http://localhost:5000/api/lessons/${lesson._id}`, payload);
+            if (isEditing && lesson?.id) {
+                await axios.put(`http://localhost:5000/api/lessons/${lesson.id}`, payload);
             } else {
                 await axios.post('http://localhost:5000/api/lessons', payload);
             }
@@ -118,9 +118,9 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
     };
 
     const handleDelete = async () => {
-        if (!lesson?._id) return;
+        if (!lesson?.id) return;
         try {
-            await axios.delete(`http://localhost:5000/api/lessons/${lesson._id}`);
+            await axios.delete(`http://localhost:5000/api/lessons/${lesson.id}`);
             onSave();
             onClose();
         } catch (err) {
@@ -222,7 +222,7 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                                     >
                                         <option value="">Selecione</option>
                                         {labs.map(lab => (
-                                            <option key={lab._id} value={lab.name}>{lab.name}</option>
+                                            <option key={lab.id} value={lab.name}>{lab.name}</option>
                                         ))}
                                     </select>
                                 </div>

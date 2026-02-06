@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const axios = require('axios');
-const db = require('../database');
+const db = require('../db');
 const { JWT_SECRET } = require('../config');
 
 const router = express.Router();
@@ -28,7 +28,7 @@ router.post('/register', async (req, res) => {
         }
 
         // Check if user exists
-        const existingUser = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+        const existingUser = (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
         if (existingUser) {
             return res.status(400).json({ error: 'User already exists' });
         }
@@ -39,11 +39,12 @@ router.post('/register', async (req, res) => {
 
         // Create user
         const userName = name || email.split('@')[0];
-        const info = db.prepare(
-            'INSERT INTO users (email, password, name, provider, provider_id) VALUES (?, ?, ?, ?, ?)'
-        ).run(email, hashedPassword, userName, 'local', null);
+        const resDb = await db.query(
+            'INSERT INTO users (email, password, name, provider, provider_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+            [email, hashedPassword, userName, 'local', null]
+        );
 
-        const userId = info.lastInsertRowid;
+        const userId = resDb.rows[0].id;
         const newUser = { id: userId, email, name: userName };
         const token = generateToken(newUser);
 
@@ -61,14 +62,13 @@ router.post('/login', async (req, res) => {
         const { email, password } = req.body;
 
         // Check user
-        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+        const user = (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
         if (!user) {
             return res.status(400).json({ error: 'Invalid credentials' });
         }
 
         if (user.provider !== 'local') {
-            // Optional: Allow password login even if social? Usually no, unless we merged accounts.
-            // For now, let's allow it IF they have a password set (which we check below).
+            // Optional: Allow password login even if social?
         }
 
         // Check valid details
@@ -98,9 +98,6 @@ router.post('/google', async (req, res) => {
         }
 
         let googleUser = {};
-
-        // Auto-detect token type: JWT (ID Token) has 3 parts separated by dots.
-        // Access Token is usually an opaque string (or different format).
         const isJwt = typeof token === 'string' && token.split('.').length === 3;
 
         if (type === 'access_token' || !isJwt) {
@@ -136,22 +133,23 @@ router.post('/google', async (req, res) => {
 
         const { email, name, googleId, picture } = googleUser;
 
-        let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+        let user = (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
 
         if (!user) {
             // Create user
-            const info = db.prepare(
-                'INSERT INTO users (email, password, name, avatar_url, provider, provider_id) VALUES (?, ?, ?, ?, ?, ?)'
-            ).run(email, 'social_login_placeholder', name, picture, 'google', googleId);
+            const resDb = await db.query(
+                'INSERT INTO users (email, password, name, avatar_url, provider, provider_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                [email, 'social_login_placeholder', name, picture, 'google', googleId]
+            );
 
-            user = { id: info.lastInsertRowid, email, name, avatar_url: picture, provider: 'google' };
+            user = { id: resDb.rows[0].id, email, name, avatar_url: picture, provider: 'google' };
         } else {
             // Link account if local or update details
             if (user.provider === 'local') {
-                db.prepare('UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?').run(googleId, picture, user.id);
+                await db.query('UPDATE users SET provider_id = $1, avatar_url = $2 WHERE id = $3', [googleId, picture, user.id]);
             } else if (user.provider === 'google') {
                 // Update avatar if changed
-                db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(picture, user.id);
+                await db.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [picture, user.id]);
             }
             // Ensure local object has latest avatar
             user.avatar_url = picture;
@@ -183,17 +181,18 @@ router.post('/microsoft', async (req, res) => {
             return res.status(400).json({ error: 'No email found in Microsoft account' });
         }
 
-        let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+        let user = (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
 
         if (!user) {
-            const info = db.prepare(
-                'INSERT INTO users (email, password, name, provider, provider_id) VALUES (?, ?, ?, ?, ?)'
-            ).run(email, 'social_login_placeholder', displayName, 'microsoft', msId);
+            const resDb = await db.query(
+                'INSERT INTO users (email, password, name, provider, provider_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+                [email, 'social_login_placeholder', displayName, 'microsoft', msId]
+            );
 
-            user = { id: info.lastInsertRowid, email, name: displayName, provider: 'microsoft' };
+            user = { id: resDb.rows[0].id, email, name: displayName, provider: 'microsoft' };
         } else {
             if (user.provider === 'local') {
-                db.prepare('UPDATE users SET provider_id = ? WHERE id = ?').run(msId, user.id);
+                await db.query('UPDATE users SET provider_id = $1 WHERE id = $2', [msId, user.id]);
             }
         }
 
@@ -207,4 +206,3 @@ router.post('/microsoft', async (req, res) => {
 });
 
 module.exports = router;
-

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, User, Bell, Menu, X, Settings, ChevronDown, ExternalLink, Moon, Sun } from 'lucide-react';
+import { LogOut, User, Bell, Menu, X, Settings, ChevronDown, ExternalLink, Moon, Sun, LayoutGrid } from 'lucide-react';
 import axios from 'axios';
 import LinkManagerModal from './LinkManagerModal';
 import { useTheme } from '../contexts/ThemeContext';
@@ -128,7 +128,7 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                                                 }}
                                                 onClick={() => setOpenCategory(null)}
                                             >
-                                                <ExternalLink size={14} color="#004587" />
+                                                <ExternalLink size={14} color="var(--text-secondary)" />
                                                 {link.title}
                                             </a>
                                         ))}
@@ -138,6 +138,15 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                         </div>
                     );
                 })}
+
+                <button
+                    onClick={() => window.location.href = '/dashboard'}
+                    title="Dashboard"
+                    style={{ padding: '8px', borderRadius: '50%', color: 'var(--text-tertiary)', opacity: 0.7 }}
+                    className="btn-icon hide-mobile"
+                >
+                    <LayoutGrid size={18} />
+                </button>
 
                 {/* Manage Links Button */}
                 <button
@@ -159,7 +168,7 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                     className="btn-icon"
                     title={isDarkMode ? "Modo Claro" : "Modo Escuro"}
                 >
-                    {isDarkMode ? <Sun size={20} color="#FFB74D" /> : <Moon size={20} color="#666" />}
+                    {isDarkMode ? <Sun size={20} color="#FFB74D" /> : <Moon size={20} color="var(--text-secondary)" />}
                 </button>
 
                 {/* Notification Bell */}
@@ -207,8 +216,8 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                             </div>
                         )}
                         <div className="hide-mobile" style={{ textAlign: 'left' }}>
-                            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#333' }}>{user?.name || 'Usuário'}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#888' }}>Professor</div>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>{user?.name || 'Usuário'}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>Professor</div>
                         </div>
                     </button>
 
@@ -252,9 +261,9 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                     .hide-mobile { display: none !important; }
                 }
                 .btn-icon { background: none; border: none; cursor: pointer; padding: 10px; border-radius: 50%; transition: background 0.2s; }
-                .btn-icon:hover { background: #f5f5f5; }
-                .nav-link-btn:hover { background-color: #F0F7FF !important; color: #0277BD !important; }
-                .dropdown-item:hover { background-color: #F5F5F5; }
+                .btn-icon:hover { background: var(--bg-secondary); }
+                .nav-link-btn:hover { background-color: var(--bg-secondary) !important; color: var(--text-primary) !important; }
+                .dropdown-item:hover { background-color: var(--bg-secondary); }
             `}</style>
         </header>
     );

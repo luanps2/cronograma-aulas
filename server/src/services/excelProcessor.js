@@ -1,95 +1,71 @@
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require('fs');
 
 async function processExcelImage(filePath) {
-    // 1. Check for API Key
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.trim() === '') {
-        console.warn('⚠️ OPENAI_API_KEY not found. Using MOCK mode for image processing.');
-
-        // Simulate processing delay
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Return Mock Data matching the user's provided Schedule (Feb 2026)
-        // Format of string in cells: "TURMA - UC - LAB"
-        return [
-            // Semana 1 (02-06 Feb)
-            { date: '2026-02-02', period: 'Noite', turma: 'TI 27', uc: 'UC12', lab: 'LAB43' },
-            { date: '2026-02-03', period: 'Noite', turma: 'TI 30', uc: 'UC12', lab: 'LAB44' },
-            { date: '2026-02-04', period: 'Tarde', turma: 'TI 28', uc: 'UC12', lab: 'LAB43' },
-            { date: '2026-02-04', period: 'Noite', turma: 'TI 27', uc: 'UC12', lab: 'LAB43' },
-            { date: '2026-02-05', period: 'Noite', turma: 'TI 30', uc: 'UC12', lab: 'LAB44' },
-            { date: '2026-02-06', period: 'Tarde', turma: 'TI 28', uc: 'UC16', lab: 'LAB43' },
-            { date: '2026-02-06', period: 'Noite', turma: 'TI 27', uc: 'UC12', lab: 'LAB43' },
-
-            // Semana 2 (09-14 Feb)
-            { date: '2026-02-09', period: 'Noite', turma: 'TI 27', uc: 'UC12', lab: 'LAB43' },
-            { date: '2026-02-10', period: 'Noite', turma: 'TI 30', uc: 'UC12', lab: 'LAB44' },
-            { date: '2026-02-11', period: 'Tarde', turma: 'TI 28', uc: 'UC12', lab: 'LAB43' },
-            { date: '2026-02-11', period: 'Noite', turma: 'TI 27', uc: 'UC12', lab: 'LAB43' },
-            { date: '2026-02-12', period: 'Noite', turma: 'TI 30', uc: 'UC12', lab: 'LAB44' },
-            { date: '2026-02-13', period: 'Tarde', turma: 'TI 28', uc: 'UC16', lab: 'LAB43' },
-            { date: '2026-02-13', period: 'Noite', turma: 'TI 27', uc: 'UC12', lab: 'LAB43' },
-
-            // Semana 3 (16-21 Feb)
-            // (Skipping Carnval/Recess days if represented by dark blue in image)
-            { date: '2026-02-19', period: 'Noite', turma: 'TI 30', uc: 'UC12', lab: 'LAB44' },
-            { date: '2026-02-20', period: 'Tarde', turma: 'TI 28', uc: 'UC12', lab: 'LAB43' },
-            { date: '2026-02-20', period: 'Noite', turma: 'TI 27', uc: 'UC12', lab: 'LAB43' },
-
-            // Semana 4 (23-27 Feb)
-            { date: '2026-02-23', period: 'Noite', turma: 'TI 27', uc: 'UC12', lab: 'LAB43' },
-            { date: '2026-02-24', period: 'Noite', turma: 'TI 30', uc: 'UC12', lab: 'LAB44' },
-            { date: '2026-02-25', period: 'Tarde', turma: 'TI 28', uc: 'UC12', lab: 'LAB43' },
-            { date: '2026-02-25', period: 'Noite', turma: 'TI 27', uc: 'UC12', lab: 'LAB43' },
-            { date: '2026-02-26', period: 'Noite', turma: 'TI 30', uc: 'UC12', lab: 'LAB44' },
-            { date: '2026-02-27', period: 'Tarde', turma: 'TI 28', uc: 'UC16', lab: 'LAB43' },
-            { date: '2026-02-27', period: 'Noite', turma: 'TI 27', uc: 'UC12', lab: 'LAB43' },
-        ];
+    if (!process.env.GOOGLE_API_KEY) {
+        throw new Error('GOOGLE_API_KEY is missing in environment variables.');
     }
 
     try {
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+        // Use Gemini 1.5 Flash as requested
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
         const imageBuffer = fs.readFileSync(filePath);
         const base64Image = imageBuffer.toString('base64');
 
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                {
-                    role: "user",
-                    content: [
-                        { type: "text", text: "Analyze this image of a class schedule. Extract lessons strictly following these rules:\n1. Look for a Month/Year header (e.g., 'Março/2026'). If found, apply it to all dates that only have day numbers.\n2. Extract Date as 'YYYY-MM-DD'. Do NOT infer current year/month if not present in the image.\n3. Extract 'Turma' (Class Name), 'UC' (Subject), 'Period' (Manhã/Tarde/Noite), 'Lab' (Laboratory).\n4. Try to identify the 'Course' (Curso) name if visible (e.g., 'Técnico em Informática').\n5. Return JSON: { lessons: [{ date, turma, uc, period, lab, description }] }. Ignore empty or irrelevant rows." },
-                        {
-                            type: "image_url",
-                            image_url: {
-                                "url": `data:image/jpeg;base64,${base64Image}`,
-                            },
-                        },
-                    ],
-                },
-            ],
-            max_tokens: 2000,
-        });
-
-        const content = response.choices[0].message.content;
-
-        // Robust JSON extraction
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            const data = JSON.parse(jsonMatch[0]);
-            return data.lessons || [];
+        const prompt = `
+        Analise esta imagem de um cronograma de aulas.
+        Extraia os dados ESTRITAMENTE seguindo este formato JSON:
+        {
+          "aulas": [
+            {
+              "data": "YYYY-MM-DD",
+              "diaSemana": "String (ex: Segunda)",
+              "periodo": "String (ex: Noite, Tarde)",
+              "turma": "String (ex: TI-27)",
+              "uc": "String (ex: UC12)",
+              "laboratorio": "String (ex: LAB43)",
+              "descricao": null
+            }
+          ]
         }
-        throw new Error('Could not parse AI response');
+        
+        REGRAS:
+        1. Procure por cabeçalho de Mês/Ano (ex: Março/2026). Se encontrar, use para compor as datas.
+        2. Se houver apenas o dia (ex: 02, 03), combine com o mês/ano identificado.
+        3. Formate a data no padrão ISO 8601 (YYYY-MM-DD).
+        4. Identifique Turma, UC, Laboratório e Período.
+        5. Retorne APENAS o JSON. Sem markdown (\`\`\`json), sem textos adicionais.
+        6. Se não encontrar dados ou a imagem estiver ilegível, retorne { "aulas": [] }.
+        `;
+
+        const imagePart = {
+            inlineData: {
+                data: base64Image,
+                mimeType: "image/jpeg", // Assuming JPEG/PNG upload, generic mimetype usually works or detect from file ext
+            },
+        };
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const response = await result.response;
+        const text = response.text();
+
+        // Clean up markdown if Gemini decides to add it despite instructions
+        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+        try {
+            const data = JSON.parse(cleanText);
+            return data.aulas || []; // Ensure we return the array
+        } catch (e) {
+            console.error("Failed to parse Gemini response:", text);
+            throw new Error("Falha ao interpretar resposta da IA: JSON inválido");
+        }
 
     } catch (error) {
-        console.error('AI Processing Error:', error);
-        // Fallback to mock on error? No, better to let the user know if the key WAS provided but failed.
-        if (error.status === 401) {
-            throw new Error('Invalid OpenAI API Key');
-        }
+        console.error("Gemini Processing Error:", error);
         throw error;
     }
 }
 
 module.exports = { processExcelImage };
-

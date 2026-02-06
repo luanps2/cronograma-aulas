@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
-const db = require('./database');
+const db = require('./db'); // Refactored to PG
 
 const authRoutes = require('./routes/auth');
 const settingsRoutes = require('./routes/settings');
@@ -20,19 +20,20 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/links', authMiddleware, linksRoutes);
+app.use('/api/dashboard', authMiddleware, require('./routes/dashboard'));
 
 // Routes
-app.get('/api/lessons', authMiddleware, (req, res) => {
+app.get('/api/lessons', authMiddleware, async (req, res) => {
     try {
-        const lessons = db.prepare('SELECT * FROM lessons').all();
-        res.json(lessons);
+        const result = await db.query('SELECT * FROM lessons');
+        res.json(result.rows);
     } catch (error) {
         console.error('Error fetching lessons:', error);
         res.status(500).json({ error: 'Error fetching lessons' });
     }
 });
 
-app.post('/api/lessons', authMiddleware, (req, res) => {
+app.post('/api/lessons', authMiddleware, async (req, res) => {
     try {
         const { courseId, turma, ucId, period, lab, date, description } = req.body;
 
@@ -41,23 +42,24 @@ app.post('/api/lessons', authMiddleware, (req, res) => {
         }
 
         // Validate hierarchy: Does this UC belong to this Course?
-        const uc = db.prepare('SELECT name FROM ucs WHERE id = ? AND courseId = ?').get(ucId, courseId);
+        const uc = (await db.query('SELECT name FROM ucs WHERE id = $1 AND courseId = $2', [ucId, courseId])).rows[0];
         if (!uc) {
             return res.status(400).json({ error: 'Inconsistency: Selected UC does not belong to the selected Course.' });
         }
 
-        const info = db.prepare(
-            'INSERT INTO lessons (courseId, turma, ucId, ucName, period, lab, date, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        ).run(courseId, turma, ucId, uc.name, period, lab, date, description);
+        const result = await db.query(
+            'INSERT INTO lessons (courseId, turma, ucId, ucName, period, lab, date, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
+            [courseId, turma, ucId, uc.name, period, lab, date, description]
+        );
 
-        res.status(201).json({ id: info.lastInsertRowid, ...req.body, ucName: uc.name });
+        res.status(201).json({ id: result.rows[0].id, ...req.body, ucName: uc.name });
     } catch (error) {
         console.error('Error creating lesson:', error);
         res.status(400).json({ error: error.message });
     }
 });
 
-app.put('/api/lessons/:id', authMiddleware, (req, res) => {
+app.put('/api/lessons/:id', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
         const { courseId, turma, ucId, period, lab, date, description } = req.body;
@@ -66,14 +68,15 @@ app.put('/api/lessons/:id', authMiddleware, (req, res) => {
             return res.status(400).json({ error: 'Course and UC are mandatory.' });
         }
 
-        const uc = db.prepare('SELECT name FROM ucs WHERE id = ? AND courseId = ?').get(ucId, courseId);
+        const uc = (await db.query('SELECT name FROM ucs WHERE id = $1 AND courseId = $2', [ucId, courseId])).rows[0];
         if (!uc) {
             return res.status(400).json({ error: 'Inconsistency: Selected UC does not belong to the selected Course.' });
         }
 
-        db.prepare(
-            'UPDATE lessons SET courseId = ?, turma = ?, ucId = ?, ucName = ?, period = ?, lab = ?, date = ?, description = ? WHERE id = ?'
-        ).run(courseId, turma, ucId, uc.name, period, lab, date, description, id);
+        await db.query(
+            'UPDATE lessons SET courseId = $1, turma = $2, ucId = $3, ucName = $4, period = $5, lab = $6, date = $7, description = $8 WHERE id = $9',
+            [courseId, turma, ucId, uc.name, period, lab, date, description, id]
+        );
 
         res.json({ id, ...req.body, ucName: uc.name });
     } catch (error) {
@@ -82,12 +85,12 @@ app.put('/api/lessons/:id', authMiddleware, (req, res) => {
     }
 });
 
-app.delete('/api/lessons/:id', authMiddleware, (req, res) => {
+app.delete('/api/lessons/:id', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
-        const result = db.prepare('DELETE FROM lessons WHERE id = ?').run(id);
+        const result = await db.query('DELETE FROM lessons WHERE id = $1', [id]);
 
-        if (result.changes === 0) {
+        if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Lesson not found' });
         }
 
@@ -111,10 +114,11 @@ app.post('/api/upload-excel', authMiddleware, upload.single('image'), async (req
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     try {
-        const lessons = await processExcelImage(req.file.path);
+        // AI returns strictly { aulas: [...] }
+        const lessonsData = await processExcelImage(req.file.path);
 
         const stats = {
-            total: lessons.length,
+            total: lessonsData.length,
             created: 0,
             skipped: 0,
             errors: 0,
@@ -122,134 +126,129 @@ app.post('/api/upload-excel', authMiddleware, upload.single('image'), async (req
         };
 
         const savedLessons = [];
-        const checkDupStmt = db.prepare('SELECT id FROM lessons WHERE date = ? AND period = ? AND turma = ? AND ucId = ? AND lab = ?');
-        const insertStmt = db.prepare(
-            'INSERT INTO lessons (courseId, turma, ucId, ucName, period, lab, date, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        );
-        const findClassStmt = db.prepare('SELECT * FROM classes WHERE name LIKE ? OR number = ?');
-        const findUCStmt = db.prepare('SELECT * FROM ucs WHERE courseId = ? AND (name LIKE ? OR desc LIKE ?)');
 
-        const findMostSimilarClass = (inputName) => {
-            // Simple robust search: try exact, then contains
-            let cls = findClassStmt.get(inputName, inputName);
-            if (!cls) {
-                // Try searching by part if "TI 31 - ..."
-                const parts = inputName.split(' ');
-                if (parts.length > 1) {
-                    // Try "TI 31" or "31"
-                    cls = findClassStmt.get(inputName, parts[parts.length - 1]);
-                }
-            }
-            return cls;
-        };
+        // Cache basic data for validation (Optimization)
+        const allClasses = (await db.query('SELECT * FROM classes')).rows;
+        const allUCs = (await db.query('SELECT * FROM ucs')).rows;
 
-        for (const lessonData of lessons) {
-            // 1. Validate mandatory fields
-            if (!lessonData.turma || !lessonData.uc || !lessonData.date || !lessonData.period) {
+        for (const lessonData of lessonsData) {
+            // Normalize Data from JSON structure: data, diaSemana, periodo, turma, uc, laboratorio, descricao
+            const { turma, uc, laboratorio, periodo, data, descricao } = lessonData;
+
+            // 1. Validate Mandatory Fields
+            if (!turma || !uc || !data || !periodo) {
                 stats.errors++;
                 stats.details.push({ lesson: lessonData, error: 'Dados incompletos (Turma, UC, Data ou Período)' });
                 continue;
             }
 
-            // 2. Resolve Class & Course
-            const cls = findMostSimilarClass(lessonData.turma);
-            if (!cls) {
-                // If strict mode, abort. Or try to find by fuzzy matching entire classes table?
-                // For now, strict on DB lookup but flexible on query
-                const allClasses = db.prepare('SELECT * FROM classes').all();
-                const fuzzyMatch = allClasses.find(c => lessonData.turma.includes(c.name) || lessonData.turma.includes(c.number));
-
-                if (!fuzzyMatch) {
-                    stats.errors++;
-                    stats.details.push({ lesson: lessonData, error: `Turma não encontrada: ${lessonData.turma}` });
-                    continue;
-                }
-                // Use found match
-                // cls = fuzzyMatch; -> Const assignment error if I reused variable, but I didn't declare cls as let yet.
-                // Refactoring to be cleaner.
-            }
-
-            // Re-evaluating variable scope inside loop
-            let targetClass = cls;
-            if (!targetClass) {
-                const allClasses = db.prepare('SELECT * FROM classes').all();
-                targetClass = allClasses.find(c => lessonData.turma.includes(c.name) || lessonData.turma.includes(c.number));
-            }
-
-            if (!targetClass) {
-                stats.errors++;
-                stats.details.push({ lesson: lessonData, error: `Turma desconhecida: ${lessonData.turma}` });
-                continue;
-            }
-
-            const courseId = targetClass.courseId;
-
-            // 3. Resolve UC
-            // Try precise match first, then fuzzy
-            let targetUC = findUCStmt.get(courseId, lessonData.uc, `%${lessonData.uc}%`);
-
-            if (!targetUC) {
-                // Try harder to find UC: split string "UC12 - Hardware" -> "UC12"
-                const ucParts = lessonData.uc.split(/[ -]/);
-                for (const part of ucParts) {
-                    if (part.length > 2) {
-                        targetUC = findUCStmt.get(courseId, part, `%${part}%`);
-                        if (targetUC) break;
-                    }
-                }
-            }
-
-            if (!targetUC) {
-                // Try getting all UCs for course and seeing if any match
-                const courseUCs = db.prepare('SELECT * FROM ucs WHERE courseId = ?').all(courseId);
-                targetUC = courseUCs.find(u => lessonData.uc.toLowerCase().includes(u.name.toLowerCase()) || lessonData.uc.toLowerCase().includes(u.desc.toLowerCase()));
-            }
-
-            if (!targetUC) {
-                stats.errors++;
-                stats.details.push({ lesson: lessonData, error: `UC não encontrada no curso ${courseId}: ${lessonData.uc}` });
-                continue;
-            }
-
-            // 4. Check Duplication
-            const exists = checkDupStmt.get(lessonData.date, lessonData.period, lessonData.turma, targetUC.id, lessonData.lab);
-            if (exists) {
-                stats.skipped++;
-                stats.details.push({ lesson: lessonData, reason: 'Aula duplicada ignorada' });
-                continue;
-            }
-
-            // 5. Insert
-            const info = insertStmt.run(
-                courseId,
-                targetClass.name, // Ensure consistent formatting matches class name not input
-                targetUC.id,
-                targetUC.name,
-                lessonData.period,
-                lessonData.lab,
-                lessonData.date,
-                lessonData.description || ''
+            // 2. Resolve Class (Turma)
+            // Fuzzy search: check if turma in JSON matches DB name or number
+            const targetClass = allClasses.find(c =>
+                turma.toLowerCase().includes(c.name.toLowerCase()) ||
+                c.name.toLowerCase().includes(turma.toLowerCase())
             );
 
-            stats.created++;
-            savedLessons.push({ id: info.lastInsertRowid, ...lessonData, courseId, ucId: targetUC.id });
+            if (!targetClass) {
+                stats.errors++;
+                stats.details.push({ lesson: lessonData, error: `Turma desconhecida no sistema: ${turma}` });
+                continue;
+            }
+
+            // 3. Resolve UC (Unit Curricular)
+            // Must belong to the course of the class
+            const targetUC = allUCs.find(u =>
+                u.courseId === targetClass.courseId &&
+                (uc.toLowerCase().includes(u.name.toLowerCase()) || u.name.toLowerCase().includes(uc.toLowerCase()))
+            );
+
+            if (!targetUC) {
+                stats.errors++;
+                stats.details.push({ lesson: lessonData, error: `UC não encontrada para o curso ${targetClass.courseId}: ${uc}` });
+                continue;
+            }
+
+            // 4. Check Duplication (Data + Period + Turma + UC + Lab)
+            const duplicateCheck = await db.query(
+                `SELECT id FROM lessons 
+                 WHERE date = $1 
+                 AND period = $2 
+                 AND turma = $3 
+                 AND ucId = $4 
+                 AND lab = $5`,
+                [data, periodo, targetClass.name, targetUC.id, laboratorio || '']
+            );
+
+            if (duplicateCheck.rows.length > 0) {
+                stats.skipped++;
+                stats.details.push({ lesson: lessonData, error: 'Aula duplicada (já existe no banco)' });
+                continue;
+            }
+
+            // 5. INSERT into Supabase
+            try {
+                const insertResult = await db.query(
+                    `INSERT INTO lessons (courseId, turma, ucId, ucName, period, lab, date, description) 
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+                     RETURNING id`,
+                    [
+                        targetClass.courseId,
+                        targetClass.name,
+                        targetUC.id,
+                        targetUC.name,
+                        periodo,
+                        laboratorio || '',
+                        data,
+                        descricao || ''
+                    ]
+                );
+
+                if (insertResult.rows[0]?.id) {
+                    stats.created++;
+                    savedLessons.push({
+                        id: insertResult.rows[0].id,
+                        date: data,
+                        period: periodo,
+                        turma: targetClass.name, // Return canonical name
+                        uc: targetUC.name,       // Return canonical name
+                        lab: laboratorio || '',
+                        courseId: targetClass.courseId
+                    });
+                } else {
+                    throw new Error('Database insert returned no ID');
+                }
+            } catch (dbErr) {
+                console.error("DB Insert Error:", dbErr);
+                stats.errors++;
+                stats.details.push({ lesson: lessonData, error: 'Erro ao salvar no banco de dados' });
+            }
+        }
+
+        // Final Success Validation
+        if (stats.created === 0) {
+            return res.status(400).json({
+                error: 'Nenhuma aula foi criada no sistema.',
+                stats,
+                details: stats.details
+            });
         }
 
         res.json({
-            message: 'Importação concluída',
+            message: 'Importação concluída com sucesso',
             stats,
-            lessonsFound: savedLessons
+            lessons: savedLessons
         });
+
     } catch (error) {
         console.error('Upload Error:', error);
-        res.status(500).json({ error: error.message || 'Failed to process image' });
+        res.status(500).json({ error: error.message || 'Falha ao processar imagem' });
     }
 });
 
 // Admin: Clear Month Endpoint
 app.delete('/api/admin/clear-month', authMiddleware, (req, res) => {
     try {
-        const { year, month } = req.body; // Expects numbers: year=2026, month=3 (1-12) or month=2 (0-11)? Let's assume 1-based index like 2026-03
+        const { year, month } = req.body;
 
         if (!year || !month) {
             return res.status(400).json({ error: 'Year and Month are required' });
@@ -257,21 +256,26 @@ app.delete('/api/admin/clear-month', authMiddleware, (req, res) => {
 
         const dateStr = `${year}-${String(month).padStart(2, '0')}`;
 
-        // Delete all lessons where date starts with YYYY-MM
-        const result = db.prepare("DELETE FROM lessons WHERE strftime('%Y-%m', date) = ?").run(dateStr);
-
-        res.json({
-            message: `Calendário de ${dateStr} limpo com sucesso`,
-            deletedCount: result.changes
-        });
+        // PG: to_char(date, 'YYYY-MM')
+        // Using parameterized query
+        db.query("DELETE FROM lessons WHERE to_char(date, 'YYYY-MM') = $1", [dateStr])
+            .then(result => {
+                res.json({
+                    message: `Calendário de ${dateStr} limpo com sucesso`,
+                    deletedCount: result.rowCount
+                });
+            })
+            .catch(error => {
+                console.error('Error clearing month:', error);
+                res.status(500).json({ error: error.message });
+            });
     } catch (error) {
-        console.error('Error clearing month:', error);
+        console.error('Error clearing month (outer):', error);
         res.status(500).json({ error: error.message });
     }
 });
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    console.log('SQLite Database connected and ready.');
+    console.log('PostgreSQL Database connected (via Pool).');
 });
-
