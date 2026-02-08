@@ -8,6 +8,7 @@ import {
     BookOpen, Users, GraduationCap, Calendar, Clock,
     Activity, TrendingUp, Layers, School
 } from 'lucide-react';
+import API_BASE_URL from '../config/api';
 
 
 export default function Dashboard() {
@@ -20,7 +21,7 @@ export default function Dashboard() {
         const fetchStats = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await axios.get('http://localhost:5000/api/dashboard/stats', {
+                const res = await axios.get(`${API_BASE_URL}/api/dashboard/stats`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setStats(res.data);

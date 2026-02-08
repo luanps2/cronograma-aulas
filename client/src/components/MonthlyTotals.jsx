@@ -4,6 +4,7 @@ import { format, subMonths, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../config/api';
 
 export default function MonthlyTotals() {
     const navigate = useNavigate();
@@ -20,7 +21,7 @@ export default function MonthlyTotals() {
         try {
             const month = currentDate.getMonth() + 1; // 1-12
             const year = currentDate.getFullYear();
-            const res = await axios.get(`http://localhost:5000/api/dashboard/monthly-stats?month=${month}&year=${year}`);
+            const res = await axios.get(`${API_BASE_URL}/api/dashboard/monthly-stats?month=${month}&year=${year}`);
             setStats(res.data);
         } catch (error) {
             console.error('Error fetching monthly stats:', error);

@@ -8,6 +8,7 @@ import UCForm from './forms/UCForm';
 import LabForm from './forms/LabForm';
 import SettingsFormModal from './SettingsFormModal';
 import ConfirmModal from './ConfirmModal';
+import API_BASE_URL from '../config/api';
 
 export default function SettingsView({ onBack, onRefresh }) {
     const [courses, setCourses] = useState([]);
@@ -48,9 +49,9 @@ export default function SettingsView({ onBack, onRefresh }) {
     const fetchAll = async () => {
         try {
             const [resCourses, resClasses, resLabs] = await Promise.all([
-                axios.get('http://localhost:5000/api/settings/courses'),
-                axios.get('http://localhost:5000/api/settings/classes'),
-                axios.get('http://localhost:5000/api/settings/labs')
+                axios.get(`${API_BASE_URL}/api/settings/courses`),
+                axios.get(`${API_BASE_URL}/api/settings/classes`),
+                axios.get(`${API_BASE_URL}/api/settings/labs`)
             ]);
             setCourses(resCourses.data);
             setClasses(resClasses.data);
@@ -65,7 +66,7 @@ export default function SettingsView({ onBack, onRefresh }) {
     const fetchUCsByCourse = async (courseId) => {
         setLoadingUCs(prev => ({ ...prev, [courseId]: true }));
         try {
-            const res = await axios.get(`http://localhost:5000/api/settings/courses/${courseId}/ucs`);
+            const res = await axios.get(`${API_BASE_URL}/api/settings/courses/${courseId}/ucs`);
             setCourseUCs(prev => ({ ...prev, [courseId]: res.data }));
         } catch (error) {
             console.error('Error fetching UCs:', error);
@@ -81,7 +82,7 @@ export default function SettingsView({ onBack, onRefresh }) {
     const handleDelete = async (type, id, parentId = null) => {
         if (!confirm('Tem certeza que deseja excluir?')) return;
         try {
-            await axios.delete(`http://localhost:5000/api/settings/${type}/${id}`);
+            await axios.delete(`${API_BASE_URL}/api/settings/${type}/${id}`);
 
             if (type === 'ucs' && parentId) {
                 // Refresh specific course UCs
@@ -112,9 +113,9 @@ export default function SettingsView({ onBack, onRefresh }) {
             }
 
             if (id) {
-                await axios.put(`http://localhost:5000/api/settings/${type}/${id}`, finalData);
+                await axios.put(`${API_BASE_URL}/api/settings/${type}/${id}`, finalData);
             } else {
-                await axios.post(`http://localhost:5000/api/settings/${type}`, finalData);
+                await axios.post(`${API_BASE_URL}/api/settings/${type}`, finalData);
             }
 
             handleCloseModal();
@@ -150,7 +151,7 @@ export default function SettingsView({ onBack, onRefresh }) {
     const handleClearMonth = async () => {
         setClearing(true);
         try {
-            const res = await axios.delete('http://localhost:5000/api/admin/clear-month', {
+            const res = await axios.delete(`${API_BASE_URL}/api/admin/clear-month`, {
                 data: { year: clearModal.year, month: clearModal.month + 1 } // API expects 1-based month
             });
             alert(res.data.message || 'Calendário limpo com sucesso.');

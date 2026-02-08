@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { GoogleLogin } from '@react-oauth/google';
+import API_BASE_URL from '../config/api';
 
 export default function LoginPage({ onLogin }) {
     const [isRegistering, setIsRegistering] = useState(false);
@@ -15,7 +16,7 @@ export default function LoginPage({ onLogin }) {
         setLoading(true);
         setError(null);
         try {
-            const res = await axios.post('http://localhost:5000/api/auth/google', {
+            const res = await axios.post(`${API_BASE_URL}/api/auth/google`, {
                 credential: credentialResponse.credential
             });
 
@@ -46,7 +47,7 @@ export default function LoginPage({ onLogin }) {
             const payload = { email, password };
             if (isRegistering) payload.name = name;
 
-            const response = await axios.post(`http://localhost:5000${endpoint}`, payload);
+            const response = await axios.post(`${API_BASE_URL}${endpoint}`, payload);
 
             if (response.data.token) {
                 localStorage.setItem('token', response.data.token);

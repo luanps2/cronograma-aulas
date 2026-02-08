@@ -7,8 +7,10 @@ import { useNavigate } from 'react-router-dom';
 
 import ImportModal from './ImportModal';
 import NewLessonModal from './NewLessonModal';
+import NewLessonModal from './NewLessonModal';
 import QuickAddModal from './QuickAddModal';
 import ConfirmModal from './ConfirmModal';
+import API_BASE_URL from '../config/api';
 
 export default function CalendarPage({ user, onLogout }) {
     const navigate = useNavigate();
@@ -52,7 +54,7 @@ export default function CalendarPage({ user, onLogout }) {
 
     const fetchLessons = async () => {
         try {
-            const response = await axios.get('http://localhost:5000/api/lessons');
+            const response = await axios.get(`${API_BASE_URL}/api/lessons`);
             const formattedLessons = response.data
                 .filter(l => l.date && !isNaN(new Date(l.date).getTime()))
                 .map(lesson => {
@@ -73,7 +75,7 @@ export default function CalendarPage({ user, onLogout }) {
 
     const fetchCourses = async () => {
         try {
-            const response = await axios.get('http://localhost:5000/api/settings/courses');
+            const response = await axios.get(`${API_BASE_URL}/api/settings/courses`);
             setCourses(response.data);
         } catch (error) {
             console.error('Error fetching courses:', error);
@@ -82,7 +84,7 @@ export default function CalendarPage({ user, onLogout }) {
 
     const handleSaveQuickAdd = async (type, payload) => {
         try {
-            await axios.post(`http://localhost:5000/api/settings/${type}`, payload);
+            await axios.post(`${API_BASE_URL}/api/settings/${type}`, payload);
             setIsQuickAddOpen(false);
             setConfirmModal({
                 isOpen: true,

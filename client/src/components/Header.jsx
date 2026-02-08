@@ -5,6 +5,7 @@ import LinkManagerModal from './LinkManagerModal';
 import ImportModal from './ImportModal'; // ADDED
 import { useTheme } from '../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../config/api';
 
 const CATEGORY_ORDER = [
     'Ferramentas',
@@ -38,7 +39,7 @@ export default function Header({ user, onLogout, onNavigateHome }) {
 
     const fetchLinks = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/links');
+            const res = await axios.get(`${API_BASE_URL}/api/links`);
             setUserLinks(res.data);
         } catch (error) {
             console.error('Error fetching header links', error);

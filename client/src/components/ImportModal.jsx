@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Upload, X, Lightbulb, CheckCircle, AlertCircle, FileSpreadsheet } from 'lucide-react';
 import axios from 'axios';
 import Modal from './Modal';
+import API_BASE_URL from '../config/api';
 
 export default function ImportModal({ isOpen, onClose, onSuccess }) {
     const [dragActive, setDragActive] = useState(false);
@@ -41,7 +42,7 @@ export default function ImportModal({ isOpen, onClose, onSuccess }) {
         formData.append('image', file); // Field name MUST match multer config ('image')
 
         try {
-            const res = await axios.post('http://localhost:5000/api/upload-excel', formData, {
+            const res = await axios.post(`${API_BASE_URL}/api/upload-excel`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 

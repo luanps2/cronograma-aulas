@@ -3,6 +3,7 @@ import { Loader2, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import ConfirmModal from './ConfirmModal';
 import Modal from './Modal';
+import API_BASE_URL from '../config/api';
 
 export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, lesson }) {
     const isEditing = !!lesson;
@@ -58,10 +59,10 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
         setLoading(true);
         try {
             const [coursesRes, classesRes, ucsRes, labsRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/settings/courses'),
-                axios.get('http://localhost:5000/api/settings/classes'),
-                axios.get('http://localhost:5000/api/settings/ucs'),
-                axios.get('http://localhost:5000/api/settings/labs')
+                axios.get(`${API_BASE_URL}/api/settings/courses`),
+                axios.get(`${API_BASE_URL}/api/settings/classes`),
+                axios.get(`${API_BASE_URL}/api/settings/ucs`),
+                axios.get(`${API_BASE_URL}/api/settings/labs`)
             ]);
             setCourses(coursesRes.data);
             setAllClasses(classesRes.data);
@@ -124,9 +125,9 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
             };
 
             if (isEditing && lesson?.id) {
-                await axios.put(`http://localhost:5000/api/lessons/${lesson.id}`, payload);
+                await axios.put(`${API_BASE_URL}/api/lessons/${lesson.id}`, payload);
             } else {
-                await axios.post('http://localhost:5000/api/lessons', payload);
+                await axios.post(`${API_BASE_URL}/api/lessons`, payload);
             }
 
             onSave();
@@ -142,7 +143,7 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
     const handleDelete = async () => {
         if (!lesson?.id) return;
         try {
-            await axios.delete(`http://localhost:5000/api/lessons/${lesson.id}`);
+            await axios.delete(`${API_BASE_URL}/api/lessons/${lesson.id}`);
             onSave();
             onClose();
         } catch (err) {

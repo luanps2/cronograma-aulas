@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Trash2, Plus, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import SettingsFormModal from './SettingsFormModal';
+import API_BASE_URL from '../config/api';
 
 const CATEGORIES = [
     'Ferramentas',
@@ -29,7 +30,7 @@ export default function LinkManagerModal({ isOpen, onClose }) {
     const fetchLinks = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:5000/api/links');
+            const res = await axios.get(`${API_BASE_URL}/api/links`);
             setLinks(res.data);
         } catch (error) {
             console.error('Failed to fetch links', error);
@@ -42,7 +43,7 @@ export default function LinkManagerModal({ isOpen, onClose }) {
         if (!title.trim() || !url.trim()) return alert('Preencha título e URL');
 
         try {
-            await axios.post('http://localhost:5000/api/links', { title, url, category });
+            await axios.post(`${API_BASE_URL}/api/links`, { title, url, category });
             setTitle('');
             setUrl('');
             fetchLinks(); // Refresh list
@@ -54,7 +55,7 @@ export default function LinkManagerModal({ isOpen, onClose }) {
     const handleDelete = async (id) => {
         if (!confirm('Excluir este link?')) return;
         try {
-            await axios.delete(`http://localhost:5000/api/links/${id}`);
+            await axios.delete(`${API_BASE_URL}/api/links/${id}`);
             fetchLinks();
         } catch (error) {
             alert('Erro ao excluir');
