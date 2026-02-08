@@ -23,15 +23,37 @@ const PORT = process.env.PORT || 5000;
 // Middlewares
 // Middlewares
 app.use(cors({
-    origin: [
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'https://cronograma-aulas.vercel.app'
-    ],
+    origin: (origin, callback) => {
+        // Permitir localhost e qualquer subdomínio vercel.app
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'http://localhost:5174'
+        ];
+
+        if (!origin) return callback(null, true); // Permitir requisições sem origem (mobile apps, curl)
+
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+            callback(null, true);
+        } else {
+            console.warn(`Bloqueado pelo CORS: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Route for Health Check (Render/Uptime checks)
+app.get('/', async (req, res) => {
+    try {
+        await db.query('SELECT 1');
+        res.json({ status: 'ok', database: 'connected', timestamp: new Date() });
+    } catch (error) {
+        console.error('Health Check Failed:', error);
+        res.status(500).json({ status: 'error', database: 'disconnected', error: error.message });
+    }
+});
 
 // Security Headers for Google Identity Services (GIS)
 app.use((req, res, next) => {
