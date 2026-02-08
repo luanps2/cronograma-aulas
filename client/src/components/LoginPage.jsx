@@ -16,6 +16,8 @@ export default function LoginPage({ onLogin }) {
         setLoading(true);
         setError(null);
         try {
+            // REGRA ABSOLUTA: Enviar SOMENTE credential (id_token).
+            // O Backend valida o id_token. NUNCA enviar access_token.
             const res = await axios.post(`${API_BASE_URL}/api/auth/google`, {
                 credential: credentialResponse.credential
             });

@@ -11,7 +11,9 @@ const config = {
 
 const validateConfig = () => {
     const errors = [];
-    if (!config.google.clientId) errors.push('Missing GOOGLE_CLIENT_ID');
+    if (!config.google.clientId) {
+        errors.push('CRITICAL: GOOGLE_CLIENT_ID is missing from environment variables.');
+    }
     // if (!config.google.clientSecret) errors.push('Missing GOOGLE_CLIENT_SECRET'); // Not strictly needed for implicit/ID token verification
 
     if (errors.length > 0) {

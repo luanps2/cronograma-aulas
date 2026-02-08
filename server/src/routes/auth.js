@@ -97,15 +97,19 @@ router.post('/google', async (req, res) => {
         }
 
         const { config } = require('../config/auth.config');
+
+        // 1. Initialize Client with CORRECT Client ID
         const client = new OAuth2Client(config.google.clientId);
 
+        // 2. STICT Verification
         const ticket = await client.verifyIdToken({
             idToken: credential,
-            audience: config.google.clientId,
+            audience: config.google.clientId, // AUDIENCE MUST MATCH CLIENT ID
         });
+
         const payload = ticket.getPayload();
 
-        // Defensive Log
+        // 3. Defensive Audience Check (Double Check)
         if (payload.aud !== config.google.clientId) {
             console.error('❌ Google Auth Audience Mismatch!');
             console.error(`   Received (payload.aud): ${payload.aud}`);

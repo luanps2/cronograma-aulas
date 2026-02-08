@@ -7,7 +7,11 @@ import './index.css'
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import ErrorBoundary from './components/ErrorBoundary';
 
-const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "MOCK_CLIENT_ID_FOR_DEV";
+const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+if (!clientId) {
+    console.error('CRITICAL: VITE_GOOGLE_CLIENT_ID is missing!');
+}
 
 import { ThemeProvider } from './contexts/ThemeContext';
 
