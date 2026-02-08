@@ -98,50 +98,75 @@ Centraliza o CRUD (Create, Read, Update, Delete) do sistema.
 
 ---
 
-## 6. Como Rodar o Projeto
+## 6. Configuração e Execução
 
-### Pré-requisitos
-- Node.js (v18+)
-- NPM
-- Chave de API OpenAI (Opcional, para recursos de IA)
-- Credenciais Google Cloud (para Login)
+### 🔧 Configuração do Ambiente
 
-### Executando o Backend
-1. Navegue até a pasta `server`:
-   ```bash
-   cd server
-   ```
-2. Instale as dependências:
-   ```bash
-   npm install
-   ```
-3. Configure o `.env` (baseado no `.env.example`):
-   - `PORT=5000`
-   - `GOOGLE_CLIENT_ID=...`
-4. Inicie o servidor:
-   ```bash
-   npm start
-   ```
-   *O banco SQLite será criado automaticamente na primeira execução.*
+Siga este guia passo a passo para configurar o projeto localmente em menos de 5 minutos.
 
-### Executando o Frontend
-1. Navegue até a pasta `client`:
-   ```bash
-   cd client
-   ```
-2. Instale as dependências:
-   ```bash
-   npm install
-   ```
-3. Inicie o servidor de desenvolvimento:
-   ```bash
-   npm run dev
-   ```
-4. Acesso: `http://localhost:5173`
+#### 1. Pré-requisitos
+- **Node.js** (v18 ou superior)
+- **NPM** (Gerenciador de pacotes)
+- Conta no **Supabase** (para Banco de Dados PostgreSQL)
+- Conta no **Google Cloud** (para Credenciais OAuth)
+
+#### 2. Configuração Inicial
+O projeto utiliza variáveis de ambiente para segurança. NUNCA commite arquivos `.env`.
+
+**Passo 1: Clonar e Instalar**
+```bash
+git clone <url-do-repositorio>
+cd senactech
+```
+
+**Passo 2: Configurar Backend**
+```bash
+cd server
+npm install
+cp .env.example .env    # Linux/Mac
+# copy .env.example .env  # Windows
+```
+Edite o arquivo `.env` gerado na pasta `server` e preencha:
+- `DATABASE_URL`: Sua string de conexão do Supabase (Transaction Pooler).
+- `JWT_SECRET`: Crie uma senha forte.
+- `GOOGLE_CLIENT_ID`: ID do cliente OAuth do Google.
+
+**Passo 3: Configurar Frontend**
+```bash
+cd ../client
+npm install
+cp .env.example .env    # Linux/Mac
+# copy .env.example .env  # Windows
+```
+Edite o arquivo `.env` gerado na pasta `client` e preencha:
+- `VITE_GOOGLE_CLIENT_ID`: O mesmo ID utilizado no backend.
+
+#### 3. Executando o Projeto
+
+**Backend:**
+```bash
+cd server
+npm start
+```
+*O servidor rodará em http://localhost:5000*
+
+**Frontend:**
+```bash
+cd client
+npm run dev
+```
+*Acesse a aplicação em http://localhost:5173*
+
+### 🛡️ Boas Práticas de Segurança
+
+- **Arquivos .env**: NUNCA devem ser versionados (estão no `.gitignore`). Eles contém segredos.
+- **Segredos em Repositórios Privados**: Mesmo em repositórios privados, não commite segredos. Desenvolvedores podem ter níveis de acesso diferentes ou o código pode vazar.
+- **Produção**: Em ambientes como Vercel ou Render, configure as variáveis diretamente no painel do provedor, não use arquivos `.env` em produção.
+- **Supabase**: Utilize o Supabase como fonte da verdade para o banco de dados.
 
 ---
 
-## 7. Boas Práticas e Observações
+## 7. Boas Práticas e Observações Técnicas
 
 - **Hierarquia de Dados**: O sistema impõe rigidez na relação Curso -> UC. Não delete um Curso sem considerar suas UCs.
 - **Hooks Reacts**: O desenvolvimento segue regras estritas (`SKILL.md`) para evitar bugs de renderização (hooks sempre no topo, sem condicionais).

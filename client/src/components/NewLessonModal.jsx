@@ -18,8 +18,10 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
     });
 
     const [courses, setCourses] = useState([]);
-    const [ucs, setUcs] = useState([]);
-    const [classes, setClasses] = useState([]);
+    const [allUcs, setAllUcs] = useState([]); // Base state for UCs
+    const [visibleUcs, setVisibleUcs] = useState([]); // Filtered UCs
+    const [allClasses, setAllClasses] = useState([]); // Base state for Classes
+    const [visibleClasses, setVisibleClasses] = useState([]); // Filtered Classes
     const [labs, setLabs] = useState([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -55,13 +57,15 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
     const fetchOptions = async () => {
         setLoading(true);
         try {
-            const [coursesRes, classesRes, labsRes] = await Promise.all([
+            const [coursesRes, classesRes, ucsRes, labsRes] = await Promise.all([
                 axios.get('http://localhost:5000/api/settings/courses'),
                 axios.get('http://localhost:5000/api/settings/classes'),
+                axios.get('http://localhost:5000/api/settings/ucs'),
                 axios.get('http://localhost:5000/api/settings/labs')
             ]);
             setCourses(coursesRes.data);
-            setClasses(classesRes.data);
+            setAllClasses(classesRes.data);
+            setAllUcs(ucsRes.data);
             setLabs(labsRes.data);
         } catch (err) {
             console.error('Error fetching options:', err);
@@ -70,15 +74,33 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
         }
     };
 
+    // FILTER LOGIC: Updates visibleClasses based on courseId and allClasses
     useEffect(() => {
-        if (formData.courseId) {
-            axios.get(`http://localhost:5000/api/settings/courses/${formData.courseId}/ucs`)
-                .then(res => setUcs(res.data))
-                .catch(err => console.error(err));
-        } else {
-            setUcs([]);
+        if (!formData.courseId) {
+            setVisibleClasses([]);
+            return;
         }
-    }, [formData.courseId]);
+
+        const filtered = allClasses.filter(cls => {
+            const cId = cls.courseId || cls.course?._id || cls.course?.id;
+            return cId && String(cId) === String(formData.courseId);
+        });
+        setVisibleClasses(filtered);
+    }, [formData.courseId, allClasses]);
+
+    // FILTER LOGIC: Updates visibleUcs based on courseId and allUcs
+    useEffect(() => {
+        if (!formData.courseId) {
+            setVisibleUcs([]);
+            return;
+        }
+
+        const filtered = allUcs.filter(uc => {
+            const cId = uc.courseId || uc.course?._id || uc.course?.id;
+            return cId && String(cId) === String(formData.courseId);
+        });
+        setVisibleUcs(filtered);
+    }, [formData.courseId, allUcs]);
 
     const handleChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -169,23 +191,45 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                                     <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Curso *</label>
                                     <select
                                         style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.9rem' }}
-                                        onChange={(e) => handleChange('courseId', e.target.value)}
+                                        onChange={(e) => {
+                                            const newCourseId = e.target.value;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                courseId: newCourseId,
+                                                turma: '', // Reset Turma
+                                                ucId: ''   // Reset UC
+                                            }));
+                                        }}
                                         value={formData.courseId}
                                     >
                                         <option value="">Selecione o Curso</option>
-                                        {courses.map(c => <option key={c.id} value={c.id}>{c.acronym}</option>)}
+                                        {courses.map(c => <option key={c.id || c._id} value={c.id || c._id}>{c.acronym}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Turma *</label>
                                     <select
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.9rem' }}
-                                        onChange={(e) => handleChange('turma', e.target.value)}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            borderRadius: '8px',
+                                            fontSize: '0.9rem',
+                                            opacity: !formData.courseId ? 0.6 : 1
+                                        }}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                turma: val,
+                                                ucId: '' // Reset UC when Class changes
+                                            }));
+                                        }}
                                         value={formData.turma}
+                                        disabled={!formData.courseId} // Disabled if no course
                                     >
                                         <option value="">Selecione a Turma</option>
-                                        {classes.filter(cls => !formData.courseId || cls.courseId === parseInt(formData.courseId)).map(cls => (
-                                            <option key={cls.id} value={cls.name}>{cls.name}</option>
+                                        {visibleClasses.map(cls => (
+                                            <option key={cls.id || cls._id} value={cls.name}>{cls.name}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -206,7 +250,7 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                                     value={formData.ucId}
                                 >
                                     <option value="">{formData.courseId ? 'Selecione uma UC...' : 'Selecione primeiro o curso'}</option>
-                                    {ucs.map(uc => (
+                                    {visibleUcs.map(uc => (
                                         <option key={uc.id} value={uc.id}>{uc.name} - {uc.desc}</option>
                                     ))}
                                 </select>

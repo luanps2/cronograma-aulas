@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
-const db = require('./db'); // Refactored to PG
+const db = require('./db'); // Refatorado para PostgreSQL
 
 const authRoutes = require('./routes/auth');
 const settingsRoutes = require('./routes/settings');
@@ -13,7 +13,7 @@ const authMiddleware = require('./middleware/authMiddleware');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
@@ -22,14 +22,14 @@ app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/links', authMiddleware, linksRoutes);
 app.use('/api/dashboard', authMiddleware, require('./routes/dashboard'));
 
-// Routes
+// Rotas
 app.get('/api/lessons', authMiddleware, async (req, res) => {
     try {
         const result = await db.query('SELECT * FROM lessons');
         res.json(result.rows);
     } catch (error) {
-        console.error('Error fetching lessons:', error);
-        res.status(500).json({ error: 'Error fetching lessons' });
+        console.error('Erro ao buscar aulas:', error);
+        res.status(500).json({ error: 'Erro ao buscar aulas' });
     }
 });
 
@@ -38,13 +38,13 @@ app.post('/api/lessons', authMiddleware, async (req, res) => {
         const { courseId, turma, ucId, period, lab, date, description } = req.body;
 
         if (!courseId || !ucId) {
-            return res.status(400).json({ error: 'Course and UC are mandatory.' });
+            return res.status(400).json({ error: 'Curso e UC são obrigatórios.' });
         }
 
-        // Validate hierarchy: Does this UC belong to this Course?
+        // Validação de Hierarquia: A UC pertence a este Curso?
         const uc = (await db.query('SELECT name FROM ucs WHERE id = $1 AND courseId = $2', [ucId, courseId])).rows[0];
         if (!uc) {
-            return res.status(400).json({ error: 'Inconsistency: Selected UC does not belong to the selected Course.' });
+            return res.status(400).json({ error: 'Inconsistência: A UC selecionada não pertence ao Curso selecionado.' });
         }
 
         const result = await db.query(
@@ -54,7 +54,7 @@ app.post('/api/lessons', authMiddleware, async (req, res) => {
 
         res.status(201).json({ id: result.rows[0].id, ...req.body, ucName: uc.name });
     } catch (error) {
-        console.error('Error creating lesson:', error);
+        console.error('Erro ao criar aula:', error);
         res.status(400).json({ error: error.message });
     }
 });
@@ -65,12 +65,12 @@ app.put('/api/lessons/:id', authMiddleware, async (req, res) => {
         const { courseId, turma, ucId, period, lab, date, description } = req.body;
 
         if (!courseId || !ucId) {
-            return res.status(400).json({ error: 'Course and UC are mandatory.' });
+            return res.status(400).json({ error: 'Curso e UC são obrigatórios.' });
         }
 
         const uc = (await db.query('SELECT name FROM ucs WHERE id = $1 AND courseId = $2', [ucId, courseId])).rows[0];
         if (!uc) {
-            return res.status(400).json({ error: 'Inconsistency: Selected UC does not belong to the selected Course.' });
+            return res.status(400).json({ error: 'Inconsistência: A UC selecionada não pertence ao Curso selecionado.' });
         }
 
         await db.query(
@@ -80,7 +80,7 @@ app.put('/api/lessons/:id', authMiddleware, async (req, res) => {
 
         res.json({ id, ...req.body, ucName: uc.name });
     } catch (error) {
-        console.error('Error updating lesson:', error);
+        console.error('Erro ao atualizar aula:', error);
         res.status(400).json({ error: error.message });
     }
 });
@@ -91,173 +91,228 @@ app.delete('/api/lessons/:id', authMiddleware, async (req, res) => {
         const result = await db.query('DELETE FROM lessons WHERE id = $1', [id]);
 
         if (result.rowCount === 0) {
-            return res.status(404).json({ error: 'Lesson not found' });
+            return res.status(404).json({ error: 'Aula não encontrada' });
         }
 
-        res.json({ message: 'Lesson deleted successfully' });
+        res.json({ message: 'Aula excluída com sucesso' });
     } catch (error) {
-        console.error('Error deleting lesson:', error);
+        console.error('Erro ao excluir aula:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-const { processExcelImage } = require('./services/excelProcessor');
+const { processExcelFile } = require('./services/excelProcessor');
 
-// Import Endpoint
+// Endpoint de Importação
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
     filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
-const upload = multer({ storage });
-
-app.post('/api/upload-excel', authMiddleware, upload.single('image'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-
-    try {
-        // AI returns strictly { aulas: [...] }
-        const lessonsData = await processExcelImage(req.file.path);
-
-        const stats = {
-            total: lessonsData.length,
-            created: 0,
-            skipped: 0,
-            errors: 0,
-            details: []
-        };
-
-        const savedLessons = [];
-
-        // Cache basic data for validation (Optimization)
-        const allClasses = (await db.query('SELECT * FROM classes')).rows;
-        const allUCs = (await db.query('SELECT * FROM ucs')).rows;
-
-        for (const lessonData of lessonsData) {
-            // Normalize Data from JSON structure: data, diaSemana, periodo, turma, uc, laboratorio, descricao
-            const { turma, uc, laboratorio, periodo, data, descricao } = lessonData;
-
-            // 1. Validate Mandatory Fields
-            if (!turma || !uc || !data || !periodo) {
-                stats.errors++;
-                stats.details.push({ lesson: lessonData, error: 'Dados incompletos (Turma, UC, Data ou Período)' });
-                continue;
-            }
-
-            // 2. Resolve Class (Turma)
-            // Fuzzy search: check if turma in JSON matches DB name or number
-            const targetClass = allClasses.find(c =>
-                turma.toLowerCase().includes(c.name.toLowerCase()) ||
-                c.name.toLowerCase().includes(turma.toLowerCase())
-            );
-
-            if (!targetClass) {
-                stats.errors++;
-                stats.details.push({ lesson: lessonData, error: `Turma desconhecida no sistema: ${turma}` });
-                continue;
-            }
-
-            // 3. Resolve UC (Unit Curricular)
-            // Must belong to the course of the class
-            const targetUC = allUCs.find(u =>
-                u.courseId === targetClass.courseId &&
-                (uc.toLowerCase().includes(u.name.toLowerCase()) || u.name.toLowerCase().includes(uc.toLowerCase()))
-            );
-
-            if (!targetUC) {
-                stats.errors++;
-                stats.details.push({ lesson: lessonData, error: `UC não encontrada para o curso ${targetClass.courseId}: ${uc}` });
-                continue;
-            }
-
-            // 4. Check Duplication (Data + Period + Turma + UC + Lab)
-            const duplicateCheck = await db.query(
-                `SELECT id FROM lessons 
-                 WHERE date = $1 
-                 AND period = $2 
-                 AND turma = $3 
-                 AND ucId = $4 
-                 AND lab = $5`,
-                [data, periodo, targetClass.name, targetUC.id, laboratorio || '']
-            );
-
-            if (duplicateCheck.rows.length > 0) {
-                stats.skipped++;
-                stats.details.push({ lesson: lessonData, error: 'Aula duplicada (já existe no banco)' });
-                continue;
-            }
-
-            // 5. INSERT into Supabase
-            try {
-                const insertResult = await db.query(
-                    `INSERT INTO lessons (courseId, turma, ucId, ucName, period, lab, date, description) 
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-                     RETURNING id`,
-                    [
-                        targetClass.courseId,
-                        targetClass.name,
-                        targetUC.id,
-                        targetUC.name,
-                        periodo,
-                        laboratorio || '',
-                        data,
-                        descricao || ''
-                    ]
-                );
-
-                if (insertResult.rows[0]?.id) {
-                    stats.created++;
-                    savedLessons.push({
-                        id: insertResult.rows[0].id,
-                        date: data,
-                        period: periodo,
-                        turma: targetClass.name, // Return canonical name
-                        uc: targetUC.name,       // Return canonical name
-                        lab: laboratorio || '',
-                        courseId: targetClass.courseId
-                    });
-                } else {
-                    throw new Error('Database insert returned no ID');
-                }
-            } catch (dbErr) {
-                console.error("DB Insert Error:", dbErr);
-                stats.errors++;
-                stats.details.push({ lesson: lessonData, error: 'Erro ao salvar no banco de dados' });
-            }
+const upload = multer({
+    storage,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.includes('sheet') || file.mimetype.includes('excel') || file.originalname.endsWith('.xlsx') || file.originalname.endsWith('.xlsm')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Formato inválido. Envie apenas arquivos Excel (.xlsx, .xlsm).'));
         }
-
-        // Final Success Validation
-        if (stats.created === 0) {
-            return res.status(400).json({
-                error: 'Nenhuma aula foi criada no sistema.',
-                stats,
-                details: stats.details
-            });
-        }
-
-        res.json({
-            message: 'Importação concluída com sucesso',
-            stats,
-            lessons: savedLessons
-        });
-
-    } catch (error) {
-        console.error('Upload Error:', error);
-        res.status(500).json({ error: error.message || 'Falha ao processar imagem' });
     }
 });
 
-// Admin: Clear Month Endpoint
+app.post('/api/upload-excel', authMiddleware, upload.single('image'), async (req, res) => {
+    // Mantido 'image' por compatibilidade com frontend, mas idealmente seria 'file'
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+
+    // FIX DEFINITIVO: Transação POR AULA + Auto-Criação de Entidades
+    // 1. Processar Arquivo (Leitura completa)
+    let excelResult;
+    try {
+        excelResult = await processExcelFile(req.file.path);
+    } catch (e) {
+        return res.status(400).json({ error: e.message });
+    }
+
+    const { lessons, stats: parseStats } = excelResult;
+
+    const stats = {
+        totalLines: parseStats.totalRows,
+        processed: 0,
+        created: 0,
+        updated: 0, // Substituídas
+        errors: 0,
+        details: []
+    };
+
+    const savedLessons = [];
+
+    // Mapeamento de Cursos (Hardcoded para robustez inicial, pode virar DB depois)
+    const COURSE_MAP = {
+        'TI': 'Técnico em Informática',
+        'TIPI': 'Técnico em Informática para Internet'
+    };
+
+    // 2. Iterar sobre as aulas (UMA TRANSAÇÃO POR LINHA)
+    for (const item of lessons) {
+        stats.processed++;
+        const { date, period, normalized, row, col } = item;
+
+        // Se erro de parse, registra e pula
+        if (item.isError) {
+            stats.errors++;
+            stats.details.push({ row, col, raw: item.raw, error: item.error });
+            continue;
+        }
+
+        let client = null;
+        try {
+            // A. Obter Conexão Exclusiva
+            client = await db.pool.connect();
+            await client.query('BEGIN');
+
+            // --- LÓGICA DE AUTO-CRIAÇÃO (IDEMPOTENTE) ---
+
+            // 1. Resolver CURSO
+            const prefix = normalized.turma.split('-')[0] || 'TI';
+            let courseName = COURSE_MAP[prefix] || `Curso Importado (${prefix})`;
+
+            let courseRes = await client.query('SELECT id FROM courses WHERE name = $1', [courseName]);
+            let courseId;
+
+            if (courseRes.rows.length === 0) {
+                const newCourse = await client.query(
+                    'INSERT INTO courses (name, acronym) VALUES ($1, $2) RETURNING id',
+                    [courseName, prefix]
+                );
+                courseId = newCourse.rows[0].id;
+            } else {
+                courseId = courseRes.rows[0].id;
+            }
+
+            // 2. Resolver TURMA
+            let classRes = await client.query('SELECT id FROM classes WHERE name = $1', [normalized.turma]);
+
+            if (classRes.rows.length === 0) {
+                await client.query(
+                    'INSERT INTO classes (name, courseid) VALUES ($1, $2)',
+                    [normalized.turma, courseId]
+                );
+            }
+
+            // 3. Resolver UNIDADE CURRICULAR (UC)
+            let ucRes = await client.query('SELECT id, name FROM ucs WHERE name = $1 AND courseid = $2', [normalized.uc, courseId]);
+            let targetUC;
+
+            if (ucRes.rows.length === 0) {
+                const newUC = await client.query(
+                    'INSERT INTO ucs (name, courseid, hours) VALUES ($1, $2, $3) RETURNING id, name',
+                    [normalized.uc, courseId, 0]
+                );
+                targetUC = newUC.rows[0];
+            } else {
+                targetUC = ucRes.rows[0];
+            }
+
+            // --- FIM AUTO-CRIAÇÃO ---
+
+            // C. Checagem de Duplicidade (Busca ID para UPDATE ou INSERT)
+            const dupCheck = await client.query(
+                `SELECT id FROM lessons WHERE date = $1 AND period = $2 AND turma = $3`,
+                [date, period, normalized.turma]
+            );
+
+            let lessonId;
+            let actionType;
+
+            if (dupCheck.rows.length > 0) {
+                // UPDATE (Substituição)
+                lessonId = dupCheck.rows[0].id;
+                await client.query(
+                    `UPDATE lessons 
+                     SET courseid = $1, ucid = $2, ucname = $3, lab = $4, description = $5
+                     WHERE id = $6`,
+                    [
+                        courseId,
+                        targetUC.id,
+                        targetUC.name,
+                        normalized.lab,
+                        'Atualizado via Importação Excel',
+                        lessonId
+                    ]
+                );
+                stats.updated++;
+                actionType = 'SUBSTITUÍDA';
+            } else {
+                // INSERT (Criação)
+                const insertResult = await client.query(
+                    `INSERT INTO lessons (courseid, turma, ucid, ucname, period, lab, date, description)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                     RETURNING id`,
+                    [
+                        courseId,
+                        normalized.turma,
+                        targetUC.id,
+                        targetUC.name,
+                        period,
+                        normalized.lab,
+                        date,
+                        'Importado via Excel'
+                    ]
+                );
+                lessonId = insertResult.rows[0].id;
+                stats.created++;
+                actionType = 'CRIADA';
+            }
+
+            // E. Sucesso
+            await client.query('COMMIT');
+
+            savedLessons.push({
+                id: lessonId,
+                date, period,
+                turma: normalized.turma,
+                uc: targetUC.name,
+                lab: normalized.lab,
+                status: actionType
+            });
+
+        } catch (rowError) {
+            // F. Erro Inesperado
+            if (client) {
+                try { await client.query('ROLLBACK'); } catch (e) { }
+            }
+            console.error(`Erro na linha ${row}:`, rowError.message);
+            stats.errors++;
+            stats.details.push({
+                row, col, raw: item.raw,
+                error: `Erro ao processar: ${rowError.message}`
+            });
+        } finally {
+            if (client) client.release();
+        }
+    }
+
+    // 4. Retorno Final
+    res.json({
+        message: 'Importação concluída com sucesso.',
+        stats,
+        lessons: savedLessons,
+        details: stats.details
+    });
+});
+
+// Admin: Endpoint para Limpar Mês
 app.delete('/api/admin/clear-month', authMiddleware, (req, res) => {
     try {
         const { year, month } = req.body;
 
         if (!year || !month) {
-            return res.status(400).json({ error: 'Year and Month are required' });
+            return res.status(400).json({ error: 'Ano e Mês são obrigatórios' });
         }
 
         const dateStr = `${year}-${String(month).padStart(2, '0')}`;
 
         // PG: to_char(date, 'YYYY-MM')
-        // Using parameterized query
+        // Usando query parametrizada
         db.query("DELETE FROM lessons WHERE to_char(date, 'YYYY-MM') = $1", [dateStr])
             .then(result => {
                 res.json({
@@ -266,16 +321,16 @@ app.delete('/api/admin/clear-month', authMiddleware, (req, res) => {
                 });
             })
             .catch(error => {
-                console.error('Error clearing month:', error);
+                console.error('Erro ao limpar mês:', error);
                 res.status(500).json({ error: error.message });
             });
     } catch (error) {
-        console.error('Error clearing month (outer):', error);
+        console.error('Erro ao limpar mês (externo):', error);
         res.status(500).json({ error: error.message });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log('PostgreSQL Database connected (via Pool).');
+    console.log(`Servidor rodando em http://localhost:${PORT}`);
+    console.log('Banco de Dados PostgreSQL conectado (via Pool).');
 });

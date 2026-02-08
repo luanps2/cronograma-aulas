@@ -81,4 +81,77 @@ router.get('/stats', async (req, res) => {
     }
 });
 
+// GET /api/dashboard/monthly-stats?month=X&year=Y
+router.get('/monthly-stats', async (req, res) => {
+    try {
+        const { month, year } = req.query;
+
+        console.log(`Fetching monthly stats for ${month}/${year}`);
+
+        if (!month || !year) {
+            return res.status(400).json({ error: 'Month and Year are required' });
+        }
+
+        // Ensure month is 0-indexed or 1-indexed? Javascript Date is 0-indexed.
+        // Let's assume input is 1-12 (human readable) for API ease.
+        // Postgres to_char(date, 'MM') returns '01'-'12'.
+        // Let's stick to strict ISO date filtering.
+
+        const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+        // Calculate end date (end of month)
+        // We can just filter by EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
+
+        const lessons = (await db.query(`
+            SELECT * FROM lessons 
+            WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
+        `, [month, year])).rows;
+
+        // Calculate Stats
+        const totalLessons = lessons.length;
+
+        const byPeriod = {
+            'Manhã': 0,
+            'Tarde': 0,
+            'Noite': 0
+        };
+
+        const byCourse = {};
+        const byClass = {};
+        const byUC = {};
+
+        lessons.forEach(lesson => {
+            // Period
+            if (byPeriod[lesson.period] !== undefined) {
+                byPeriod[lesson.period]++;
+            } else {
+                // Handle variance if any
+                byPeriod[lesson.period] = (byPeriod[lesson.period] || 0) + 1;
+            }
+
+            // Course (we assume course name is available or we need join? Lesson table has courseId usually, looking at previous queries it seems 'ucName' is there?)
+            // Looking at dashboard.js: "SELECT id, date, turma, ucName, description FROM lessons"
+            // It seems 'turma' is the Class.
+            // Let's aggregate by 'turma' (Class) and 'uc' (UC).
+
+            if (lesson.turma) {
+                byClass[lesson.turma] = (byClass[lesson.turma] || 0) + 1;
+            }
+            if (lesson.uc) {
+                byUC[lesson.uc] = (byUC[lesson.uc] || 0) + 1;
+            }
+        });
+
+        res.json({
+            total: totalLessons,
+            byPeriod,
+            byClass,
+            byUC
+        });
+
+    } catch (error) {
+        console.error('Error fetching monthly stats:', error);
+        res.status(500).json({ error: 'Failed to fetch monthly statistics' });
+    }
+});
+
 module.exports = router;

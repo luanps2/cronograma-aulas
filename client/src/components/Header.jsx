@@ -2,20 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { LogOut, User, Bell, Menu, X, Settings, ChevronDown, ExternalLink, Moon, Sun, LayoutGrid } from 'lucide-react';
 import axios from 'axios';
 import LinkManagerModal from './LinkManagerModal';
+import ImportModal from './ImportModal'; // ADDED
 import { useTheme } from '../contexts/ThemeContext';
+import { useNavigate } from 'react-router-dom';
 
 const CATEGORY_ORDER = [
     'Ferramentas',
     'Documentos',
     'Links Úteis',
-    'Atividades' // Merged group for simpler header
+    'Atividades'
 ];
 
+const dropdownItemStyle = {
+    width: '100%', padding: '12px 15px', background: 'none', border: 'none',
+    textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
+    color: 'var(--text-primary)', cursor: 'pointer', transition: 'background 0.2s',
+    fontSize: '0.9rem', textDecoration: 'none'
+};
+
 export default function Header({ user, onLogout, onNavigateHome }) {
+    const navigate = useNavigate();
     const { isDarkMode, toggleTheme } = useTheme();
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [userLinks, setUserLinks] = useState([]);
     const [isLinkManagerOpen, setIsLinkManagerOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false); // ADDED
     const [openCategory, setOpenCategory] = useState(null);
 
     // Simple notification mock
@@ -139,24 +150,7 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                     );
                 })}
 
-                <button
-                    onClick={() => window.location.href = '/dashboard'}
-                    title="Dashboard"
-                    style={{ padding: '8px', borderRadius: '50%', color: 'var(--text-tertiary)', opacity: 0.7 }}
-                    className="btn-icon hide-mobile"
-                >
-                    <LayoutGrid size={18} />
-                </button>
-
-                {/* Manage Links Button */}
-                <button
-                    onClick={() => setIsLinkManagerOpen(true)}
-                    title="Personalizar Atalhos"
-                    style={{ padding: '8px', borderRadius: '50%', color: 'var(--text-tertiary)', opacity: 0.7 }}
-                    className="btn-icon"
-                >
-                    <Settings size={18} />
-                </button>
+                {/* Removed Dashboard and Settings buttons from here as they are now in the User Menu */}
             </div>
 
             {/* Right: Actions & User */}
@@ -199,14 +193,14 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                                 src={user.avatar_url}
                                 alt={user.name}
                                 style={{
-                                    width: '48px', height: '48px', // Increased Size
+                                    width: '48px', height: '48px',
                                     borderRadius: '50%', objectFit: 'cover',
                                     border: '2px solid #fff', boxShadow: '0 0 0 2px #E3F2FD'
                                 }}
                             />
                         ) : (
                             <div style={{
-                                width: '48px', height: '48px', // Increased Size
+                                width: '48px', height: '48px',
                                 borderRadius: '50%', background: '#E3F2FD', color: '#0277BD',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 fontWeight: 'bold', border: '2px solid #fff', boxShadow: '0 0 0 2px #E3F2FD',
@@ -226,22 +220,38 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                             position: 'absolute', top: '120%', right: 0,
                             background: 'var(--bg-primary)', borderRadius: '8px',
                             boxShadow: 'var(--card-shadow)', border: '1px solid var(--border-color)',
-                            width: '200px', overflow: 'hidden', zIndex: 1001
+                            width: '220px', overflow: 'hidden', zIndex: 1001
                         }}>
                             <div style={{ padding: '15px', borderBottom: '1px solid var(--border-color)' }}>
-                                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{user?.name}</div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>{user?.email}</div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.name}</div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</div>
                             </div>
+
+                            <button onClick={() => { setIsUserMenuOpen(false); navigate('/dashboard'); }} className="dropdown-item" style={dropdownItemStyle}>
+                                <LayoutGrid size={16} /> Dashboard
+                            </button>
+                            <button onClick={() => { setIsUserMenuOpen(false); navigate('/settings'); }} className="dropdown-item" style={dropdownItemStyle}>
+                                <Settings size={16} /> Configurações
+                            </button>
+                            <button onClick={() => { setIsUserMenuOpen(false); navigate('/monthly-totals'); }} className="dropdown-item" style={dropdownItemStyle}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '1.1rem' }}>📊</span> Total de Aulas (Mês)
+                                </div>
+                            </button>
+                            <button onClick={() => { setIsUserMenuOpen(false); setIsImportModalOpen(true); }} className="dropdown-item" style={dropdownItemStyle}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2E7D32' }}>
+                                    <span style={{ fontSize: '1.1rem' }}>📥</span> Importar Planilha
+                                </div>
+                            </button>
+
+                            <div style={{ height: '1px', background: 'var(--border-color)', margin: '5px 0' }}></div>
+
                             <button
                                 onClick={onLogout}
-                                style={{
-                                    width: '100%', padding: '12px 15px', background: 'none', border: 'none',
-                                    textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
-                                    color: '#D32F2F', cursor: 'pointer', transition: 'background 0.2s'
-                                }}
+                                style={{ ...dropdownItemStyle, color: '#D32F2F' }}
                                 className="dropdown-item"
                             >
-                                <LogOut size={18} /> Sair
+                                <LogOut size={16} /> Sair
                             </button>
                         </div>
                     )}
@@ -252,7 +262,17 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                 isOpen={isLinkManagerOpen}
                 onClose={() => {
                     setIsLinkManagerOpen(false);
-                    fetchLinks(); // Refresh links on close
+                    fetchLinks();
+                }}
+            />
+
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onImportSuccess={() => {
+                    // Dispatch global event for CalendarPage to refresh
+                    window.dispatchEvent(new Event('lessons-updated'));
+                    // Also refresh header links if needed, though unlikely affected immediately
                 }}
             />
 

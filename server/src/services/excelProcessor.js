@@ -1,71 +1,167 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const fs = require('fs');
+const ExcelJS = require('exceljs');
 
-async function processExcelImage(filePath) {
-    if (!process.env.GOOGLE_API_KEY) {
-        throw new Error('GOOGLE_API_KEY is missing in environment variables.');
+/**
+ * Normaliza o texto para o formato padrão.
+ * - TI27, TI-27, TI 27 -> TI-27
+ * - UC12, UC 12 -> UC12
+ * - LAB43, LAB 43, LAB-43 -> LAB43
+ */
+function normalizeText(text, type) {
+    if (!text) return null;
+    let upper = text.toString().toUpperCase().trim();
+
+    // Remover acentos
+    upper = upper.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    if (type === 'TURMA') {
+        // Expectativa do Professor/Usuário: TI-27
+        // Remove espaços, depois insere hífen se faltar
+        let clean = upper.replace(/\s+/g, '').replace(/-/g, '');
+        if (clean.startsWith('TI')) {
+            const num = clean.replace('TI', '');
+            return `TI-${num}`;
+        }
+        return upper; // Fallback
     }
 
-    try {
-        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-        // Use Gemini 1.5 Flash as requested
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-        const imageBuffer = fs.readFileSync(filePath);
-        const base64Image = imageBuffer.toString('base64');
-
-        const prompt = `
-        Analise esta imagem de um cronograma de aulas.
-        Extraia os dados ESTRITAMENTE seguindo este formato JSON:
-        {
-          "aulas": [
-            {
-              "data": "YYYY-MM-DD",
-              "diaSemana": "String (ex: Segunda)",
-              "periodo": "String (ex: Noite, Tarde)",
-              "turma": "String (ex: TI-27)",
-              "uc": "String (ex: UC12)",
-              "laboratorio": "String (ex: LAB43)",
-              "descricao": null
-            }
-          ]
+    if (type === 'UC') {
+        // Expectativa do Professor/Usuário: UC12
+        let clean = upper.replace(/\s+/g, '').replace(/-/g, '');
+        if (clean.startsWith('UC')) {
+            // Lidar com algarismos romanos se necessário, mas por prompt "UC12" é padrão
+            return clean;
         }
-        
-        REGRAS:
-        1. Procure por cabeçalho de Mês/Ano (ex: Março/2026). Se encontrar, use para compor as datas.
-        2. Se houver apenas o dia (ex: 02, 03), combine com o mês/ano identificado.
-        3. Formate a data no padrão ISO 8601 (YYYY-MM-DD).
-        4. Identifique Turma, UC, Laboratório e Período.
-        5. Retorne APENAS o JSON. Sem markdown (\`\`\`json), sem textos adicionais.
-        6. Se não encontrar dados ou a imagem estiver ilegível, retorne { "aulas": [] }.
-        `;
-
-        const imagePart = {
-            inlineData: {
-                data: base64Image,
-                mimeType: "image/jpeg", // Assuming JPEG/PNG upload, generic mimetype usually works or detect from file ext
-            },
-        };
-
-        const result = await model.generateContent([prompt, imagePart]);
-        const response = await result.response;
-        const text = response.text();
-
-        // Clean up markdown if Gemini decides to add it despite instructions
-        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        try {
-            const data = JSON.parse(cleanText);
-            return data.aulas || []; // Ensure we return the array
-        } catch (e) {
-            console.error("Failed to parse Gemini response:", text);
-            throw new Error("Falha ao interpretar resposta da IA: JSON inválido");
+        // Lidar com erro de digitação "UE12"
+        if (clean.startsWith('UE')) {
+            return clean.replace('UE', 'UC');
         }
-
-    } catch (error) {
-        console.error("Gemini Processing Error:", error);
-        throw error;
+        return clean;
     }
+
+    if (type === 'LAB') {
+        // Expectativa do Professor/Usuário: LAB43
+        let clean = upper.replace(/\s+/g, '').replace(/-/g, '');
+        if (clean.startsWith('LAB')) {
+            return clean;
+        }
+        // Lidar com "LABORATORIO 43"
+        if (clean.includes('LAB')) {
+            const num = clean.match(/\d+/);
+            if (num) return `LAB${num[0]}`;
+        }
+        return clean;
+    }
+
+    return upper;
 }
 
-module.exports = { processExcelImage };
+async function processExcelFile(filePath) {
+    console.log(`Iniciando processamento Excel para: ${filePath}`);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+
+    // 1. Localizar Aba
+    const sheet = workbook.getWorksheet('EXPORT_APP');
+    if (!sheet) {
+        throw new Error('Aba "EXPORT_APP" não encontrada no arquivo.');
+    }
+
+    const lessons = [];
+    const stats = {
+        totalRows: 0,
+        processedRows: 0,
+        detectedLessons: 0
+    };
+
+    // 2. Iterar Linhas
+    // Pular Cabeçalho (Linha 1 geralmente, mas podemos verificar)
+    // Assumimos que os dados começam na Linha 2
+    sheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // Pular Cabeçalho
+
+        stats.totalRows++;
+
+        // Coluna A: Data (1)
+        const dateCell = row.getCell(1).value;
+        if (!dateCell) return; // Pular linhas vazias
+
+        // Lidar com parsing de Data
+        let dateObj = null;
+        try {
+            // ExcelJS retorna datas como objetos geralmente, ou strings
+            if (dateCell instanceof Date) {
+                dateObj = dateCell;
+            } else if (typeof dateCell === 'string') {
+                // Esperado DD/MM/YYYY
+                const parts = dateCell.split('/');
+                if (parts.length === 3) {
+                    dateObj = new Date(parts[2], parts[1] - 1, parts[0]);
+                }
+            } else if (typeof dateCell === 'object' && dateCell.result) {
+                // Resultado de fórmula
+                if (dateCell.result instanceof Date) dateObj = dateCell.result;
+            }
+        } catch (e) {
+            console.warn(`Linha ${rowNumber}: Data Inválida`, dateCell);
+            return;
+        }
+
+        if (!dateObj || isNaN(dateObj.getTime())) {
+            // Tentar parse estrito de string se data do Excel falhou
+            // Às vezes vem como número (data serial do Excel)
+            // ExcelJS geralmente lida com isso, mas vamos garantir.
+            // Se inválido, pular linha
+            return;
+        }
+
+        // Converter para YYYY-MM-DD para o Banco
+        const dateStr = dateObj.toISOString().split('T')[0];
+
+        // Coluna C: Tarde (3)
+        // Coluna D: Noite (4)
+        const afternoonCell = row.getCell(3).text; // .text pega o resultado ou string visível
+        const eveningCell = row.getCell(4).text;
+
+        const parseCell = (cellText, period) => {
+            if (!cellText) return;
+
+            // Separar por quebra de linha
+            const lines = cellText.split(/\r?\n/).filter(l => l.trim().length > 0);
+
+            lines.forEach(line => {
+                // Esperado: TURMA - UC - LAB
+                // Permitir " - " ou " – " (en dash) ou apenas "-"
+                const parts = line.split(/[-–—]+/).map(p => p.trim()).filter(p => p.length > 0);
+
+                if (parts.length >= 2) {
+                    // Precisamos pelo menos de Turma e UC
+                    const rawTurma = parts[0];
+                    const rawUC = parts[1];
+                    const rawLab = parts[2] || 'EM SALA'; // Padrão ou vazio?
+
+                    lessons.push({
+                        row: rowNumber,
+                        date: dateStr,
+                        period: period,
+                        raw: { turma: rawTurma, uc: rawUC, lab: rawLab },
+                        normalized: {
+                            turma: normalizeText(rawTurma, 'TURMA'),
+                            uc: normalizeText(rawUC, 'UC'),
+                            lab: normalizeText(rawLab, 'LAB')
+                        }
+                    });
+                    stats.detectedLessons++;
+                }
+            });
+        };
+
+        parseCell(afternoonCell, 'Tarde');
+        parseCell(eveningCell, 'Noite');
+
+        stats.processedRows++;
+    });
+
+    return { lessons, stats };
+}
+
+module.exports = { processExcelFile };

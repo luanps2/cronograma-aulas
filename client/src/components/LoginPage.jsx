@@ -1,80 +1,40 @@
 import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import axios from 'axios';
-
-import { useGoogleLogin } from '@react-oauth/google';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function LoginPage({ onLogin }) {
     const [isRegistering, setIsRegistering] = useState(false);
-    // ... state variables ... (no change needed to existing state here, just keeping context)
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    const loginWithGoogle = useGoogleLogin({
-        onSuccess: async (tokenResponse) => {
-            setLoading(true);
-            try {
-                const res = await axios.post('http://localhost:5000/api/auth/google', {
-                    token: tokenResponse.credential || tokenResponse.access_token // handle implicit vs auth code flow if needed, usually tokenResponse.credential for GIS but react-oauth gives access_token often
-                });
+    const handleGoogleSuccess = async (credentialResponse) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await axios.post('http://localhost:5000/api/auth/google', {
+                credential: credentialResponse.credential
+            });
 
-                // Note: @react-oauth/google default flow returns an access_token. 
-                // The backend endpoint currently expects an idToken or similar. 
-                // Let's ensure consistency. If backend uses google-auth-library verifyIdToken, we need an ID Token.
-                // However, useGoogleLogin (implicit) returns access_token. 
-                // We might need to switch backend to userinfo endpoint OR frontend to ID token flow.
-                // EASIEST PATH: Send access_token and let backend call Google userinfo.
-                // BUT wait, current backend uses `client.verifyIdToken`. That implies ID Token.
-                // To get ID Token with @react-oauth/google, we use the <GoogleLogin /> component OR flow: 'auth-code'.
-                // Let's stick to the current backend implementation which expects `token` (ID Token).
-                // Actually, let's look at backend code again: 
-                // `client.verifyIdToken({ idToken: token ...` -> YES, it needs ID Token.
-                // `useGoogleLogin` by default gives access_token (OAuth2). 
-                // `GoogleLogin` component gives credential (JWT ID Token).
-                // Let's use `useGoogleLogin` but fetch user info manually OR change backend?
-                // NO, let's keep it simple. useGoogleLogin has an `onSuccess` that gives a token response.
-                // If we want ID token, we might need flow: 'auth-code' and exchange it, OR just use the <GoogleLogin> button component?
-                // The design uses a custom button.
-                // Let's just swap backend strategy to be more robust for access_tokens if needed, 
-                // OR simpler: Use the access_token to fetch user profile from GOOGLE in the backend?
-                // Let's modify the frontend to send whatever we get, and if it fails, we fix backend.
-
-                // Correction: `useGoogleLogin` is for custom buttons. It returns `access_token`. 
-                // Backend `verifyIdToken` needs JWT.
-                // If we want to keep backend `verifyIdToken`, we should use the <GoogleLogin> component (which renders Google's button).
-                // But USER wants custom design.
-                // So, we will use `useGoogleLogin` -> get `access_token` -> Send to backend -> Backend uses `access_token` to call https://www.googleapis.com/oauth2/v3/userinfo.
-
-                // I will update this frontend code to send `token: tokenResponse.access_token`.
-                // AND I will silently update backend to support this or just use the userinfo endpoint, which is easier.
-
-                // Let's stick to frontend first.
-
-                // Actually, let's try to get ID Token if possible? No, implicit flow gives access token.
-                // We will send access_token.
-
-                const response = await axios.post('http://localhost:5000/api/auth/google', {
-                    token: tokenResponse.access_token,
-                    type: 'access_token' // hint for backend
-                });
-
-                if (response.data.token) {
-                    localStorage.setItem('token', response.data.token);
-                    localStorage.setItem('user', JSON.stringify(response.data.user));
-                    onLogin(response.data.user, response.data.token);
-                }
-            } catch (err) {
-                console.error(err);
-                setError('Falha no login com Google.');
-            } finally {
-                setLoading(false);
+            if (res.data.token) {
+                localStorage.setItem('token', res.data.token);
+                localStorage.setItem('user', JSON.stringify(res.data.user));
+                onLogin(res.data.user, res.data.token);
             }
-        },
-        onError: () => setError('Falha no login com Google')
-    });
+        } catch (err) {
+            console.error('Google Login Error:', err);
+            setError('Falha no login com Google. Tente novamente.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleError = () => {
+        setError('Login com Google falhou. Tente novamente.');
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -101,12 +61,8 @@ export default function LoginPage({ onLogin }) {
         }
     };
 
-    const handleSocialLogin = (provider) => {
-        if (provider === 'Google') {
-            loginWithGoogle();
-            return;
-        }
-        alert(`Login com ${provider} requer configuração de variáveis de ambiente (CLIENT_ID) e reinicialização para ativar as bibliotecas de OAuth.`);
+    const handleMicrosoftLogin = () => {
+        alert('Login com Microsoft ainda não configurado para GIS/Graph API neste redesign.');
     };
 
     return (
@@ -124,53 +80,38 @@ export default function LoginPage({ onLogin }) {
                 borderRadius: '16px',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
                 width: '100%',
-                maxWidth: '450px',
+                maxWidth: '400px', // Slightly narrower for better vertical feel
                 textAlign: 'center'
             }}>
-                <div style={{ marginBottom: '30px' }}>
-                    <img src="/senac-logo.png" alt="Senac" style={{ height: '60px', marginBottom: '20px' }} />
-                    <h2 style={{ fontSize: '24px', color: '#333' }}>
-                        {isRegistering ? 'Crie sua conta' : 'Bem-vindo de volta'}
-                    </h2>
-                    <p style={{ color: '#666', marginTop: '8px' }}>
-                        {isRegistering ? 'Cadastre-se para gerenciar suas aulas' : 'Acesse seu planejamento acadêmico'}
-                    </p>
-                </div>
+                {/* 1. Logo Senac */}
+                <img src="/senac-logo.png" alt="Senac" style={{ height: '50px', marginBottom: '20px' }} />
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '30px' }}>
-                    <button className="btn-outline" onClick={() => handleSocialLogin('Google')} style={{ justifyContent: 'center', padding: '12px', fontSize: '1rem', position: 'relative' }}>
-                        <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" style={{ width: '20px', position: 'absolute', left: '20px' }} />
-                        Continuar com Google
-                    </button>
-                    <button className="btn-outline" onClick={() => handleSocialLogin('Microsoft')} style={{ justifyContent: 'center', padding: '12px', fontSize: '1rem', position: 'relative' }}>
-                        <img src="https://www.svgrepo.com/show/452269/microsoft.svg" alt="Microsoft" style={{ width: '20px', position: 'absolute', left: '20px' }} />
-                        Continuar com Microsoft
-                    </button>
-                </div>
+                {/* 2. Welcome Text */}
+                <h2 style={{ fontSize: '22px', color: '#333', marginBottom: '5px', fontWeight: 600 }}>
+                    {isRegistering ? 'Crie sua conta' : 'Bem-vindo de volta'}
+                </h2>
+                <p style={{ color: '#666', fontSize: '14px', marginBottom: '30px' }}>
+                    {isRegistering ? 'Preencha seus dados para começar' : 'Acesse seu painel acadêmico'}
+                </p>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0', color: '#999' }}>
-                    <div style={{ flex: 1, height: '1px', background: '#EEE' }}></div>
-                    <span style={{ fontSize: '0.85rem' }}>OU</span>
-                    <div style={{ flex: 1, height: '1px', background: '#EEE' }}></div>
-                </div>
-
+                {/* 3. Form */}
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     {isRegistering && (
                         <div style={{ textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.9rem', fontWeight: 500, color: '#555' }}>Nome</label>
+                            <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500, color: '#555' }}>Nome Completo</label>
                             <input
                                 type="text"
                                 placeholder="Seu Nome"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #DDD', fontSize: '1rem' }}
+                                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E0E0E0', fontSize: '0.95rem', boxSizing: 'border-box' }}
                                 required
                             />
                         </div>
                     )}
 
                     <div style={{ textAlign: 'left' }}>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.9rem', fontWeight: 500, color: '#555' }}>Email</label>
+                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500, color: '#555' }}>Email</label>
                         <div style={{ position: 'relative' }}>
                             <Mail size={18} color="#999" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                             <input
@@ -178,14 +119,14 @@ export default function LoginPage({ onLogin }) {
                                 placeholder="seu@email.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                style={{ width: '100%', padding: '10px 10px 10px 40px', borderRadius: '8px', border: '1px solid #DDD', fontSize: '1rem' }}
+                                style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '8px', border: '1px solid #E0E0E0', fontSize: '0.95rem', boxSizing: 'border-box' }}
                                 required
                             />
                         </div>
                     </div>
 
                     <div style={{ textAlign: 'left' }}>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.9rem', fontWeight: 500, color: '#555' }}>Senha</label>
+                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500, color: '#555' }}>Senha</label>
                         <div style={{ position: 'relative' }}>
                             <Lock size={18} color="#999" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                             <input
@@ -193,26 +134,89 @@ export default function LoginPage({ onLogin }) {
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                style={{ width: '100%', padding: '10px 10px 10px 40px', borderRadius: '8px', border: '1px solid #DDD', fontSize: '1rem' }}
+                                style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '8px', border: '1px solid #E0E0E0', fontSize: '0.95rem', boxSizing: 'border-box' }}
                                 required
                             />
                         </div>
                     </div>
 
-                    {error && <div style={{ color: 'red', fontSize: '0.9rem', marginTop: '5px' }}>{error}</div>}
+                    {error && <div style={{ color: '#D32F2F', fontSize: '0.85rem', marginTop: '5px', background: '#FFEBEE', padding: '8px', borderRadius: '6px' }}>{error}</div>}
 
-                    <button className="btn-primary" disabled={loading} style={{ padding: '12px', marginTop: '10px', justifyContent: 'center', fontSize: '1rem' }}>
-                        {loading ? <Loader2 className="animate-spin" /> : <>{isRegistering ? 'Cadastrar' : 'Entrar'} <ArrowRight size={18} /></>}
+                    {/* 4. Submit Button */}
+                    <button className="btn-primary" disabled={loading} style={{
+                        padding: '12px',
+                        marginTop: '10px',
+                        justifyContent: 'center',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        backgroundColor: '#004A8D', // Senac Blue
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'background 0.2s',
+                        width: '100%'
+                    }}>
+                        {loading ? <Loader2 className="animate-spin" /> : <>{isRegistering ? 'Criar Conta' : 'Entrar'}</>}
                     </button>
                 </form>
 
-                <div style={{ marginTop: '20px', fontSize: '0.9rem', color: '#666' }}>
-                    {isRegistering ? 'Já tem uma conta?' : 'Não tem uma conta?'}{' '}
+                {/* 5. Divider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '24px 0', color: '#BDBDBD' }}>
+                    <div style={{ flex: 1, height: '1px', background: '#E0E0E0' }}></div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>OU CONTINUE COM</span>
+                    <div style={{ flex: 1, height: '1px', background: '#E0E0E0' }}></div>
+                </div>
+
+                {/* 6. Social Buttons */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+                    <div style={{ width: '100%', maxWidth: '320px', display: 'flex', justifyContent: 'center' }}>
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={handleGoogleError}
+                            theme="outline"
+                            size="large"
+                            text="continue_with"
+                            width="320"
+                            locale="pt-BR"
+                        />
+                    </div>
+
                     <button
-                        onClick={() => setIsRegistering(!isRegistering)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F68B1F', fontWeight: 'bold', textDecoration: 'none' }}
+                        onClick={handleMicrosoftLogin}
+                        style={{
+                            justifyContent: 'center',
+                            padding: '10px',
+                            fontSize: '0.9rem',
+                            position: 'relative',
+                            background: 'white',
+                            border: '1px solid #DADCE0',
+                            borderRadius: '4px',
+                            color: '#3C4043',
+                            fontWeight: 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            height: '40px', // Standard Google Button height
+                            width: '100%',
+                            maxWidth: '320px'
+                        }}>
+                        <img src="https://www.svgrepo.com/show/452269/microsoft.svg" alt="Microsoft" style={{ width: '18px', marginRight: '10px' }} />
+                        Continuar com Microsoft
+                    </button>
+                </div>
+
+                {/* 7. Toggle Link */}
+                <div style={{ marginTop: '30px', fontSize: '0.9rem', color: '#666' }}>
+                    {isRegistering ? 'Já tem uma conta?' : 'Não tem uma conta?'}
+                    <button
+                        onClick={() => { setIsRegistering(!isRegistering); setError(null); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#004A8D', fontWeight: 'bold', textDecoration: 'none', marginLeft: '5px' }}
                     >
-                        {isRegistering ? 'Entrar' : 'Cadastre-se'}
+                        {isRegistering ? 'Fazer Login' : 'Cadastre-se'}
                     </button>
                 </div>
             </div>

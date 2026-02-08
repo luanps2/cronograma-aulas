@@ -90,48 +90,30 @@ router.post('/login', async (req, res) => {
 // Google Login
 router.post('/google', async (req, res) => {
     try {
-        console.log('Google Auth Request Body:', req.body); // DEBUG
-        const { token, type } = req.body;
+        const { credential } = req.body; // Expecting 'credential' (ID Token) from GIS
 
-        if (!process.env.GOOGLE_CLIENT_ID) {
-            return res.status(501).json({ error: 'Google Login not configured (Missing GOOGLE_CLIENT_ID)' });
+        if (!credential) {
+            return res.status(400).json({ error: 'Missing Google credential (ID Token)' });
         }
 
-        let googleUser = {};
-        const isJwt = typeof token === 'string' && token.split('.').length === 3;
+        const { config } = require('../config/auth.config');
+        const client = new OAuth2Client(config.google.clientId);
 
-        if (type === 'access_token' || !isJwt) {
-            // Flow for Custom Button (Access Token)
-            console.log('Validating as Access Token...');
-            const userInfoRes = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            console.log('Google User Info:', userInfoRes.data); // DEBUG
-            googleUser = {
-                email: userInfoRes.data.email,
-                name: userInfoRes.data.name,
-                googleId: userInfoRes.data.sub,
-                picture: userInfoRes.data.picture
-            };
-        } else {
-            // Flow for Standard Google Button (ID Token)
-            console.log('Validating as ID Token...');
-            const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-            const ticket = await client.verifyIdToken({
-                idToken: token,
-                audience: process.env.GOOGLE_CLIENT_ID,
-            });
-            const payload = ticket.getPayload();
-            console.log('Google ID Token Payload:', payload); // DEBUG
-            googleUser = {
-                email: payload.email,
-                name: payload.name,
-                googleId: payload.sub,
-                picture: payload.picture
-            };
+        const ticket = await client.verifyIdToken({
+            idToken: credential,
+            audience: config.google.clientId,
+        });
+        const payload = ticket.getPayload();
+
+        // Defensive Log
+        if (payload.aud !== config.google.clientId) {
+            console.error('❌ Google Auth Audience Mismatch!');
+            console.error(`   Received (payload.aud): ${payload.aud}`);
+            console.error(`   Expected (config.google.clientId): ${config.google.clientId}`);
+            return res.status(401).json({ error: 'Token audience mismatch. Check GOOGLE_CLIENT_ID configuration.' });
         }
 
-        const { email, name, googleId, picture } = googleUser;
+        const { email, name, sub: googleId, picture } = payload;
 
         let user = (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
 
@@ -159,8 +141,8 @@ router.post('/google', async (req, res) => {
         res.json({ token: jwtToken, user: { id: user.id, email: user.email, name: user.name, avatar_url: user.avatar_url } });
 
     } catch (error) {
-        console.error('Google Auth Error:', error.response?.data || error.message);
-        res.status(401).json({ error: 'Google authentication failed' });
+        console.error('Google Auth Error:', error.message);
+        res.status(401).json({ error: 'Google authentication failed: ' + error.message });
     }
 });
 
