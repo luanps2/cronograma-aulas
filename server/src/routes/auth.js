@@ -61,29 +61,43 @@ router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email e senha são obrigatórios.' });
+        }
+
         // Check user
         const user = (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
         if (!user) {
-            return res.status(400).json({ error: 'Invalid credentials' });
+            return res.status(401).json({ error: 'Credenciais inválidas.' }); // 401 para não revelar existência
         }
 
-        if (user.provider !== 'local') {
-            // Optional: Allow password login even if social?
+        // CRITICAL FIX: Prevent bcrypt error (500) on social accounts
+        if (user.provider === 'google') {
+            return res.status(403).json({ error: 'Esta conta usa login com Google. Por favor, use o botão "Continuar com Google".' });
+        }
+        if (user.provider === 'microsoft') {
+            return res.status(403).json({ error: 'Esta conta usa login com Microsoft. Por favor, use o botão "Continuar com Microsoft".' });
         }
 
         // Check valid details
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ error: 'Invalid credentials' });
+        try {
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                return res.status(401).json({ error: 'Credenciais inválidas.' });
+            }
+        } catch (bcryptError) {
+            console.error('BCrypt Error for user:', email, bcryptError);
+            // Fallback safety
+            return res.status(500).json({ error: 'Erro interno ao validar credenciais.' });
         }
 
         // Create token
         const token = generateToken(user);
-        res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+        res.json({ token, user: { id: user.id, email: user.email, name: user.name, avatar_url: user.avatar_url } });
 
     } catch (error) {
         console.error('Login Error:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Erro interno no servidor via Login.' });
     }
 });
 
@@ -112,9 +126,9 @@ router.post('/google', async (req, res) => {
         // 3. Defensive Audience Check (Double Check)
         if (payload.aud !== config.google.clientId) {
             console.error('❌ Google Auth Audience Mismatch!');
-            console.error(`   Received (payload.aud): ${payload.aud}`);
-            console.error(`   Expected (config.google.clientId): ${config.google.clientId}`);
-            return res.status(401).json({ error: 'Token audience mismatch. Check GOOGLE_CLIENT_ID configuration.' });
+            console.error(`   Received (payload.aud): ${payload.aud.substring(0, 15)}...`);
+            console.error(`   Expected (config.google.clientId): ${config.google.clientId.substring(0, 15)}...`);
+            return res.status(401).json({ error: `Token audience mismatch. Expected ${config.google.clientId.substring(0, 10)}...` });
         }
 
         const { email, name, sub: googleId, picture } = payload;
