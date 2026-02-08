@@ -7,7 +7,6 @@ import { useNavigate } from 'react-router-dom';
 
 import ImportModal from './ImportModal';
 import NewLessonModal from './NewLessonModal';
-import NewLessonModal from './NewLessonModal';
 import QuickAddModal from './QuickAddModal';
 import ConfirmModal from './ConfirmModal';
 import API_BASE_URL from '../config/api';
