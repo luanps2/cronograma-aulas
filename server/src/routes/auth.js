@@ -59,11 +59,12 @@ router.post('/register', async (req, res) => {
 // Login (Local)
 router.post('/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const passwordValue = password || req.body.senha;
 
-        if (!email || !password) {
+        if (!email || !passwordValue) {
             return res.status(400).json({ error: 'Email e senha são obrigatórios.' });
         }
+
 
         // Check user
         const user = (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
@@ -102,67 +103,84 @@ router.post('/login', async (req, res) => {
 });
 
 // Google Login
+// Google Login (GIS - Definitivo)
 router.post('/google', async (req, res) => {
     try {
-        const { credential } = req.body; // Expecting 'credential' (ID Token) from GIS
+        const { credential } = req.body;
 
         if (!credential) {
-            return res.status(400).json({ error: 'Missing Google credential (ID Token)' });
+            return res.status(400).json({ error: 'Google credential não fornecida.' });
         }
 
-        const { config } = require('../config/auth.config');
+        if (!process.env.GOOGLE_CLIENT_ID) {
+            console.error('❌ GOOGLE_CLIENT_ID não definido no ambiente.');
+            return res.status(500).json({ error: 'Configuração inválida do servidor.' });
+        }
 
-        // 1. Initialize Client with CORRECT Client ID
-        const client = new OAuth2Client(config.google.clientId);
+        const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-        // 2. STICT Verification
         const ticket = await client.verifyIdToken({
             idToken: credential,
-            audience: config.google.clientId, // AUDIENCE MUST MATCH CLIENT ID
+            audience: process.env.GOOGLE_CLIENT_ID,
         });
 
         const payload = ticket.getPayload();
 
-        // 3. Defensive Audience Check (Double Check)
-        if (payload.aud !== config.google.clientId) {
-            console.error('❌ Google Auth Audience Mismatch!');
-            console.error(`   Received (payload.aud): ${payload.aud.substring(0, 15)}...`);
-            console.error(`   Expected (config.google.clientId): ${config.google.clientId.substring(0, 15)}...`);
-            return res.status(401).json({ error: `Token audience mismatch. Expected ${config.google.clientId.substring(0, 10)}...` });
+        if (payload.aud !== process.env.GOOGLE_CLIENT_ID) {
+            console.error('❌ Audience mismatch');
+            console.error('Recebido:', payload.aud);
+            console.error('Esperado:', process.env.GOOGLE_CLIENT_ID);
+            return res.status(401).json({ error: 'Token Google inválido (audience mismatch).' });
         }
 
         const { email, name, sub: googleId, picture } = payload;
 
-        let user = (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
+        let user = (await db.query(
+            'SELECT * FROM users WHERE email = $1',
+            [email]
+        )).rows[0];
 
         if (!user) {
-            // Create user
             const resDb = await db.query(
-                'INSERT INTO users (email, password, name, avatar_url, provider, provider_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-                [email, 'social_login_placeholder', name, picture, 'google', googleId]
+                `INSERT INTO users 
+                (email, password, name, avatar_url, provider, provider_id)
+                VALUES ($1, $2, $3, $4, 'google', $5)
+                RETURNING id`,
+                [email, 'social_login', name, picture, googleId]
             );
 
-            user = { id: resDb.rows[0].id, email, name, avatar_url: picture, provider: 'google' };
+            user = {
+                id: resDb.rows[0].id,
+                email,
+                name,
+                avatar_url: picture,
+            };
         } else {
-            // Link account if local or update details
-            if (user.provider === 'local') {
-                await db.query('UPDATE users SET provider_id = $1, avatar_url = $2 WHERE id = $3', [googleId, picture, user.id]);
-            } else if (user.provider === 'google') {
-                // Update avatar if changed
-                await db.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [picture, user.id]);
-            }
-            // Ensure local object has latest avatar
+            await db.query(
+                'UPDATE users SET avatar_url = $1 WHERE id = $2',
+                [picture, user.id]
+            );
             user.avatar_url = picture;
         }
 
-        const jwtToken = generateToken(user);
-        res.json({ token: jwtToken, user: { id: user.id, email: user.email, name: user.name, avatar_url: user.avatar_url } });
+        const token = generateToken(user);
+
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                avatar_url: user.avatar_url,
+            },
+        });
 
     } catch (error) {
-        console.error('Google Auth Error:', error.message);
-        res.status(401).json({ error: 'Google authentication failed: ' + error.message });
+        console.error('Google Auth Error:', error);
+        res.status(401).json({ error: 'Falha na autenticação com Google.' });
     }
 });
+
 
 // Microsoft Login
 router.post('/microsoft', async (req, res) => {
