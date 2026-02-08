@@ -205,7 +205,12 @@ export default function LoginPage({ onLogin }) {
                             width: '100%',
                             maxWidth: '320px'
                         }}>
-                        <img src="https://www.svgrepo.com/show/452269/microsoft.svg" alt="Microsoft" style={{ width: '18px', marginRight: '10px' }} />
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 23 23" style={{ marginRight: '10px' }}>
+                            <path fill="#f35325" d="M1 1h10v10H1z" />
+                            <path fill="#81bc06" d="M12 1h10v10H12z" />
+                            <path fill="#05a6f0" d="M1 12h10v10H1z" />
+                            <path fill="#ffba08" d="M12 12h10v10H12z" />
+                        </svg>
                         Continuar com Microsoft
                     </button>
                 </div>
