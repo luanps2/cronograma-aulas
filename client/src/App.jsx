@@ -6,7 +6,6 @@ import Layout from './components/Layout';
 import SettingsView from './components/SettingsView';
 import CalendarPage from './components/CalendarPage';
 import Dashboard from './components/Dashboard';
-import MonthlyTotals from './components/MonthlyTotals';
 
 const initAuthHelper = (token, storedUser) => {
     if (token && storedUser) {
@@ -114,7 +113,6 @@ function App() {
                 <Route path="/" element={<CalendarPage user={user} onLogout={handleLogout} />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/settings" element={<SettingsView onBack={() => navigate('/')} />} />
-                <Route path="/monthly-totals" element={<MonthlyTotals />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </Layout>

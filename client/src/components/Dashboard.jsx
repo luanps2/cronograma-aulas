@@ -46,6 +46,20 @@ export default function Dashboard() {
         }
     };
 
+    const fetchStats = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/dashboard/stats`);
+            setStats(res.data);
+        } catch (error) {
+            console.error('Dashboard Stats Error:', error);
+            setError(error.response?.data?.error || 'Falha ao carregar estatísticas');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (loading) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-primary)' }}>

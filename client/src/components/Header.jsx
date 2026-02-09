@@ -325,11 +325,6 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                             <button onClick={() => { setIsUserMenuOpen(false); navigate('/settings'); }} className="dropdown-item" style={dropdownItemStyle}>
                                 <Settings size={16} /> Configurações
                             </button>
-                            <button onClick={() => { setIsUserMenuOpen(false); navigate('/monthly-totals'); }} className="dropdown-item" style={dropdownItemStyle}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ fontSize: '1.1rem' }}>📊</span> Total de Aulas (Mês)
-                                </div>
-                            </button>
                             <button onClick={() => { setIsUserMenuOpen(false); setIsImportModalOpen(true); }} className="dropdown-item" style={dropdownItemStyle}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2E7D32' }}>
                                     <span style={{ fontSize: '1.1rem' }}>📥</span> Importar Planilha
@@ -386,8 +381,9 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                     }
                 }
 
-                .btn-icon { background: none; border: none; cursor: pointer; padding: 10px; border-radius: 50%; transition: background 0.2s; }
+                .btn-icon { background: none; border: none; cursor: pointer; padding: 10px; border-radius: 50%; transition: background 0.2s; outline: none; }
                 .btn-icon:hover { background: var(--bg-secondary); }
+                .btn-icon:focus { outline: none; }
                 .nav-link-btn:hover { background-color: var(--bg-secondary) !important; color: var(--text-primary) !important; }
                 .dropdown-item:hover { background-color: var(--bg-secondary); }
             `}</style>
