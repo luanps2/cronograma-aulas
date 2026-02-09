@@ -62,7 +62,11 @@ router.post('/register', async (req, res) => {
 
     } catch (error) {
         console.error('Register Error:', error);
-        res.status(500).json({ error: 'Erro interno no servidor.' });
+        // Retorna 500 JSON com detalhe seguro em dev
+        res.status(500).json({
+            error: 'Erro interno no servidor ao registrar usuário.',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 });
 
@@ -110,7 +114,10 @@ router.post('/login', async (req, res) => {
 
     } catch (error) {
         console.error('Login Error:', error);
-        res.status(500).json({ error: 'Erro interno no servidor.' });
+        res.status(500).json({
+            error: 'Erro interno no servidor ao realizar login.',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 });
 

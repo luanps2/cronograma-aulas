@@ -5,9 +5,8 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 let pool = null;
 
-// Objeto de exportação mutável para permitir atualização do 'pool'
 const dbExports = {
-    pool: null, // Será preenchido após connect()
+    pool: null,
     query: async (text, params) => {
         if (!pool) {
             throw new Error('Database not initialized. Call connect() first.');
@@ -35,19 +34,15 @@ const dbExports = {
                 const originalHost = url.hostname;
 
                 console.log(`🔍 Resolvendo DNS para: ${originalHost}`);
-                const addresses = await dns.resolve4(originalHost);
+                // FIX: dns.lookup com family: 4 usa o resolver do SO (getaddrinfo), 
+                // que funciona melhor no Render do que dns.resolve4 (query direta).
+                const { address } = await dns.lookup(originalHost, { family: 4 });
 
-                if (addresses && addresses.length > 0) {
-                    const ip = addresses[0];
-                    console.log(`✅ DNS Resolvido: ${originalHost} -> ${ip}`);
+                if (address) {
+                    console.log(`✅ DNS Resolvido: ${originalHost} -> ${address}`);
 
                     // Atualiza a config para usar o IP diretamente
-                    // Mantemos o connectionString original mas injetamos o host/port na config
-                    // O pg usa as propriedades do objeto config com prioridade sobre a string se misturado,
-                    // mas é mais seguro modificar a string ou passar host explicitamente.
-
-                    // Modificando a URL para usar o IP
-                    url.hostname = ip;
+                    url.hostname = address;
                     config.connectionString = url.toString();
 
                     console.log('Using IPv4 Connection String (Host replaced with IP)');
