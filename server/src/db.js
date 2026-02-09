@@ -5,27 +5,45 @@ require('dotenv').config();
 let pool = null;
 let isConnecting = false;
 
+// Configure DNS to use public resolvers (Render's DNS may be blocking Supabase)
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+
 /**
- * Resolve hostname to IPv4 address using OS resolver
- * This is the ONLY way to force IPv4 on Render
+ * Resolve hostname to IPv4 using public DNS
  */
 async function resolveToIPv4(hostname) {
     try {
-        console.log(`🔍 Resolvendo "${hostname}" para IPv4...`);
-        const { address } = await dns.lookup(hostname, { family: 4 });
-        console.log(`✅ Resolvido: ${hostname} -> ${address}`);
-        return address;
+        console.log(`🔍 Resolvendo "${hostname}" com DNS público...`);
+
+        // Try lookup with IPv4 family
+        const addresses = await dns.resolve4(hostname);
+
+        if (addresses && addresses.length > 0) {
+            const ip = addresses[0];
+            console.log(`✅ Resolvido: ${hostname} -> ${ip}`);
+            return ip;
+        }
+
+        throw new Error('Nenhum endereço IPv4 retornado');
     } catch (error) {
-        console.error(`❌ Falha ao resolver ${hostname}:`, error.message);
-        throw new Error(`Não foi possível resolver ${hostname} para IPv4: ${error.message}`);
+        console.error(`❌ Falha DNS para ${hostname}:`, error.message);
+
+        // Fallback: try standard lookup
+        try {
+            console.log('   Tentando fallback com dns.lookup...');
+            const { address } = await dns.lookup(hostname, { family: 4 });
+            console.log(`✅ Fallback OK: ${hostname} -> ${address}`);
+            return address;
+        } catch (fallbackError) {
+            throw new Error(`DNS falhou: ${error.message}, Fallback: ${fallbackError.message}`);
+        }
     }
 }
 
 /**
- * Parse DATABASE_URL and replace hostname with IPv4 address
+ * Build IPv4 connection string
  */
 async function buildIPv4ConnectionString(connectionString) {
-    // Parse URL
     const url = new URL(connectionString);
     const originalHost = url.hostname;
 
@@ -34,7 +52,7 @@ async function buildIPv4ConnectionString(connectionString) {
         return connectionString;
     }
 
-    // Force IPv4 resolution
+    // Resolve to IPv4
     const ipv4Address = await resolveToIPv4(originalHost);
 
     // Replace hostname with IP
@@ -44,7 +62,7 @@ async function buildIPv4ConnectionString(connectionString) {
 }
 
 /**
- * Create database pool with IPv4-forced connection
+ * Create pool with IPv4 connection
  */
 async function ensurePool() {
     if (pool) return pool;
@@ -60,15 +78,15 @@ async function ensurePool() {
         const originalConnectionString = process.env.DATABASE_URL;
 
         if (!originalConnectionString) {
-            throw new Error('DATABASE_URL não configurado nas variáveis de ambiente');
+            throw new Error('DATABASE_URL não configurado');
         }
 
         console.log('🔄 Inicializando conexão PostgreSQL...');
 
-        // CRITICAL: Force IPv4 by resolving DNS manually
+        // Force IPv4 by resolving DNS manually
         const ipv4ConnectionString = await buildIPv4ConnectionString(originalConnectionString);
 
-        // Create pool with IPv4 connection string
+        // Create pool
         const config = {
             connectionString: ipv4ConnectionString,
             ssl: process.env.NODE_ENV === 'production'
@@ -84,21 +102,21 @@ async function ensurePool() {
 
         // Test connection
         const client = await pool.connect();
-        const result = await client.query('SELECT NOW() as now, version() as version');
+        const result = await client.query('SELECT NOW() as now');
         client.release();
 
         console.log('✅ PostgreSQL conectado:', result.rows[0].now);
 
         // Error handler
         pool.on('error', (err) => {
-            console.error('❌ Erro no pool PostgreSQL:', err.message);
+            console.error('❌ Pool error:', err.message);
         });
 
         return pool;
 
     } catch (error) {
         pool = null;
-        console.error('❌ Falha ao conectar no PostgreSQL:', error.message);
+        console.error('❌ Falha ao conectar PostgreSQL:', error.message);
         throw error;
     } finally {
         isConnecting = false;
@@ -106,7 +124,7 @@ async function ensurePool() {
 }
 
 /**
- * Execute query with automatic connection
+ * Execute query
  */
 async function query(text, params) {
     await ensurePool();
@@ -114,7 +132,7 @@ async function query(text, params) {
 }
 
 /**
- * Get pool for transactions
+ * Get pool
  */
 async function getPool() {
     await ensurePool();
@@ -122,7 +140,7 @@ async function getPool() {
 }
 
 /**
- * Test connection (for health checks)
+ * Test connection
  */
 async function testConnection() {
     try {
