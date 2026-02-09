@@ -9,6 +9,7 @@ const dbExports = {
     pool: null,
     query: async (text, params) => {
         if (!pool) {
+            console.error('⚠️ DB Query attempted before initialization!'); // Warn if query called early
             throw new Error('Database not initialized. Call connect() first.');
         }
         return pool.query(text, params);
@@ -16,8 +17,13 @@ const dbExports = {
     connect: async () => {
         if (pool) return pool;
 
-        console.log('🔄 Inicializando conexão com o Banco de Dados...');
+        console.log('🔄 Inicializando conexão com o Banco de Dados (Tentativa IPv4)...');
         let connectionString = process.env.DATABASE_URL;
+
+        if (!connectionString) {
+            throw new Error('DATABASE_URL not set in environment variables');
+        }
+
         let config = {
             connectionString,
             ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
@@ -27,45 +33,48 @@ const dbExports = {
         };
 
         try {
-            // Tenta resolver IPv4 manualmente para evitar problemas com IPv6 no Render
-            // Apenas se não for localhost
+            // FORCE IPv4: Render often defaults to IPv6 which Supabase doesn't fully support on free tiers
+            // checks if we need to resolve
             if (!connectionString.includes('localhost') && !connectionString.includes('127.0.0.1')) {
                 const url = new URL(connectionString);
                 const originalHost = url.hostname;
 
-                console.log(`🔍 Resolvendo DNS para: ${originalHost}`);
-                // FIX: dns.lookup com family: 4 usa o resolver do SO (getaddrinfo), 
-                // que funciona melhor no Render do que dns.resolve4 (query direta).
+                console.log(`🔍 Resolvendo DNS IPv4 para: ${originalHost}`);
+
+                // dns.lookup with family: 4 matches standard getaddrinfo behavior
                 const { address } = await dns.lookup(originalHost, { family: 4 });
 
                 if (address) {
                     console.log(`✅ DNS Resolvido: ${originalHost} -> ${address}`);
 
-                    // Atualiza a config para usar o IP diretamente
+                    // Rewrite config to use IP
                     url.hostname = address;
                     config.connectionString = url.toString();
-
-                    console.log('Using IPv4 Connection String (Host replaced with IP)');
+                } else {
+                    throw new Error(`Nenhum endereço IPv4 encontrado para ${originalHost}`);
                 }
             }
         } catch (dnsError) {
-            console.warn('⚠️ Falha na resolução DNS IPv4 manual, usando original:', dnsError.message);
+            console.error('❌ Falha CRÍTICA na resolução DNS IPv4:', dnsError.message);
+            // FAIL FAST: Não tente conectar com o original se a resolução falhou, 
+            // pois isso causa o ENETUNREACH IPv6 que derruba o app.
+            throw dnsError;
         }
 
+        // Initialize Pool with IPv4 Config
         pool = new Pool(config);
 
-        // Teste de Conexão
+        // Connectivity Test
         try {
             const client = await pool.connect();
             const res = await client.query('SELECT NOW()');
             client.release();
             console.log('✅ Banco de Dados conectado com sucesso:', res.rows[0].now);
 
-            // Atualiza export
             dbExports.pool = pool;
             return pool;
         } catch (err) {
-            console.error('❌ Erro Crítico ao conectar no Pool do DB:', err);
+            console.error('❌ Erro Crítico ao conectar no Pool do DB:', err.message);
             throw err;
         }
     }

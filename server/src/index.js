@@ -181,18 +181,24 @@ app.delete('/api/admin/clear-month', authMiddleware, (req, res) => {
     }
 });
 
-// Inicialização do Servidor
+// Inicialização do Servidor (Bootstrap)
 const startServer = async () => {
     try {
-        // Tenta conectar ao Banco de Dados antes de abrir a porta
+        console.log('🚀 Iniciando servidor...');
+
+        // 1. Tenta conectar ao Banco de Dados (Bloqueante)
+        // Se falhar aqui, o app nem abre a porta, evitando "zumbis"
         await db.connect();
 
+        // 2. Abre a porta apenas se o DB estiver OK
         app.listen(PORT, () => {
-            console.log(`Servidor rodando em http://localhost:${PORT}`);
+            console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
+            console.log(`✅ Ambiente: ${process.env.NODE_ENV || 'development'}`);
         });
     } catch (error) {
-        console.error('❌ Falha fatal na inicialização do servidor:', error);
-        process.exit(1);
+        console.error('❌ Falha fatal na inicialização do servidor:', error.message);
+        console.error('   Verifique a conexão com o banco de dados e as variáveis de ambiente.');
+        process.exit(1); // Encerra o processo com erro para o Render reiniciar ou alertar
     }
 };
 
