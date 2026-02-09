@@ -181,7 +181,19 @@ app.delete('/api/admin/clear-month', authMiddleware, (req, res) => {
     }
 });
 
+// Inicialização do Servidor
+const startServer = async () => {
+    try {
+        // Tenta conectar ao Banco de Dados antes de abrir a porta
+        await db.connect();
+
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
-    console.log('Banco de Dados PostgreSQL conectado (via Pool).');
-});
+        });
+    } catch (error) {
+        console.error('❌ Falha fatal na inicialização do servidor:', error);
+        process.exit(1);
+    }
+};
+
+startServer();
