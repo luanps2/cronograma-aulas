@@ -187,8 +187,8 @@ const startServer = async () => {
         // Tenta conectar ao Banco de Dados antes de abrir a porta
         await db.connect();
 
-app.listen(PORT, () => {
-    console.log(`Servidor rodando em http://localhost:${PORT}`);
+        app.listen(PORT, () => {
+            console.log(`Servidor rodando em http://localhost:${PORT}`);
         });
     } catch (error) {
         console.error('❌ Falha fatal na inicialização do servidor:', error);
