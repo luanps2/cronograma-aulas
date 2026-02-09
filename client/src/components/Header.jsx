@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { LogOut, User, Bell, Menu, X, Settings, ChevronDown, ExternalLink, Moon, Sun, LayoutGrid } from 'lucide-react';
 import axios from 'axios';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import LinkManagerModal from './LinkManagerModal';
 import ImportModal from './ImportModal'; // ADDED
 import { useTheme } from '../contexts/ThemeContext';
@@ -30,12 +32,24 @@ export default function Header({ user, onLogout, onNavigateHome }) {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false); // ADDED
     const [openCategory, setOpenCategory] = useState(null);
 
-    // Simple notification mock
-    const notifications = 2;
+    // Real notifications
+    const [notifications, setNotifications] = useState([]);
+    const [isNotifOpen, setIsNotifOpen] = useState(false);
 
     useEffect(() => {
         fetchLinks();
+        fetchTodayNotifications();
     }, []);
+
+    const fetchTodayNotifications = async () => {
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const res = await axios.get(`${API_BASE_URL}/api/lessons?date=${today}`);
+            setNotifications(res.data || []);
+        } catch (error) {
+            console.error('Error fetching notifications:', error);
+        }
+    };
 
     const fetchLinks = async () => {
         try {
@@ -185,18 +199,73 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                 </button>
 
                 {/* Notification Bell */}
-                <button className="btn-icon" style={{ position: 'relative' }}>
-                    <Bell size={20} color={isDarkMode ? '#AAA' : '#666'} />
-                    {notifications > 0 && (
-                        <span style={{
-                            position: 'absolute', top: -2, right: -2,
-                            background: '#EF5350', color: 'white', borderRadius: '50%',
-                            width: '18px', height: '18px', fontSize: '11px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold',
-                            border: '2px solid white'
-                        }}>{notifications}</span>
+                <div style={{ position: 'relative' }}>
+                    <button
+                        onClick={() => setIsNotifOpen(!isNotifOpen)}
+                        className="btn-icon"
+                        style={{ position: 'relative' }}
+                    >
+                        <Bell size={20} color={isDarkMode ? '#AAA' : '#666'} />
+                        {notifications.length > 0 && (
+                            <span style={{
+                                position: 'absolute', top: -2, right: -2,
+                                background: '#EF5350', color: 'white', borderRadius: '50%',
+                                width: '18px', height: '18px', fontSize: '11px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold',
+                                border: '2px solid white'
+                            }}>{notifications.length}</span>
+                        )}
+                    </button>
+
+                    {/* Notification Dropdown */}
+                    {isNotifOpen && (
+                        <div style={{
+                            position: 'absolute',
+                            top: '50px',
+                            right: '0',
+                            width: '350px',
+                            maxWidth: '90vw',
+                            backgroundColor: 'var(--bg-primary)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            zIndex: 1000,
+                            maxHeight: '500px',
+                            overflow: 'auto'
+                        }}>
+                            <div style={{ padding: '15px', borderBottom: '1px solid var(--border-color)' }}>
+                                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Aulas de Hoje</h4>
+                            </div>
+                            {notifications.length > 0 ? (
+                                <div>
+                                    {notifications.map((lesson, idx) => (
+                                        <div key={idx} style={{
+                                            padding: '15px',
+                                            borderBottom: idx < notifications.length - 1 ? '1px solid var(--border-color)' : 'none',
+                                            cursor: 'pointer',
+                                            transition: 'background 0.2s'
+                                        }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginBottom: '5px' }}>
+                                                {lesson.date && format(new Date(lesson.date), "dd 'de' MMMM", { locale: ptBR })}
+                                            </div>
+                                            <div style={{ fontWeight: 600, marginBottom: '5px' }}>{lesson.period}</div>
+                                            <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>Lab:</strong> {lesson.lab}</div>
+                                            <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>Turma:</strong> {lesson.turma}</div>
+                                            <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>UC:</strong> {lesson.uc}</div>
+                                            {lesson.description && <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: '5px' }}>{lesson.description}</div>}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                                    Nenhuma aula agendada para hoje
+                                </div>
+                            )}
+                        </div>
                     )}
-                </button>
+                </div>
 
                 {/* User Dropdown */}
                 <div style={{ position: 'relative' }}>

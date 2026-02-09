@@ -68,6 +68,20 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
             setAllClasses(classesRes.data);
             setAllUcs(ucsRes.data);
             setLabs(labsRes.data);
+
+            // If editing, immediately filter for current courseId
+            if (isEditing && lesson && lesson.courseId) {
+                const filteredClasses = classesRes.data.filter(cls => {
+                    const cId = cls.courseId || cls.course?._id || cls.course?.id;
+                    return cId && String(cId) === String(lesson.courseId);
+                });
+                const filteredUcs = ucsRes.data.filter(uc => {
+                    const cId = uc.courseId || uc.course?._id || uc.course?.id;
+                    return cId && String(cId) === String(lesson.courseId);
+                });
+                setVisibleClasses(filteredClasses);
+                setVisibleUcs(filteredUcs);
+            }
         } catch (err) {
             console.error('Error fetching options:', err);
         } finally {

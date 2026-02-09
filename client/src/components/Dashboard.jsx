@@ -6,8 +6,10 @@ import {
 } from 'recharts';
 import {
     BookOpen, Users, GraduationCap, Calendar, Clock,
-    Activity, TrendingUp, Layers, School
+    Activity, TrendingUp, Layers, School, ChevronLeft, ChevronRight
 } from 'lucide-react';
+import { format, subMonths, addMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import API_BASE_URL from '../config/api';
 
 
@@ -17,24 +19,32 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await axios.get(`${API_BASE_URL}/api/dashboard/stats`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setStats(res.data);
-            } catch (error) {
-                console.error("Error fetching dashboard stats", error);
-                setError("Não foi possível carregar os dados do painel. Tente novamente mais tarde.");
-            } finally {
-                setLoading(false);
-            }
-        };
+    // Monthly stats state
+    const [monthlyDate, setMonthlyDate] = useState(new Date());
+    const [monthlyStats, setMonthlyStats] = useState(null);
+    const [loadingMonthly, setLoadingMonthly] = useState(false);
 
+    useEffect(() => {
         fetchStats();
     }, []);
+
+    useEffect(() => {
+        fetchMonthlyStats();
+    }, [monthlyDate]);
+
+    const fetchMonthlyStats = async () => {
+        setLoadingMonthly(true);
+        try {
+            const month = monthlyDate.getMonth() + 1;
+            const year = monthlyDate.getFullYear();
+            const res = await axios.get(`${API_BASE_URL}/api/dashboard/monthly-stats?month=${month}&year=${year}`);
+            setMonthlyStats(res.data);
+        } catch (error) {
+            console.error('Error fetching monthly stats:', error);
+        } finally {
+            setLoadingMonthly(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -83,27 +93,72 @@ export default function Dashboard() {
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
+
     return (
         <div style={{ padding: '24px', maxWidth: '1600px', margin: '0 auto' }}>
             <h1 style={{ color: 'var(--text-primary)', marginBottom: '24px', fontSize: '1.8rem' }}>Dashboard Acadêmico</h1>
-            {/* DEBUG: Visible indicator */}
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginBottom: '10px' }}>
-                Rendered at: {new Date().toLocaleTimeString()}
-            </div>
 
-
-            {/* 1. KPIs */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '20px',
-                marginBottom: '32px'
-            }}>
+            {/* 1. KPIs - Row layout on mobile */}
+            <div className="dashboard-kpis">
                 <KPICard icon={<BookOpen />} title="Cursos" value={currentStats.kpis.courses} color="#2196F3" />
                 <KPICard icon={<Layers />} title="Turmas" value={currentStats.kpis.classes} color="#4CAF50" />
                 <KPICard icon={<School />} title="UCs" value={currentStats.kpis.ucs} color="#FF9800" />
                 <KPICard icon={<Calendar />} title="Aulas" value={currentStats.kpis.lessons} color="#F44336" />
                 <KPICard icon={<Users />} title="Usuários" value={currentStats.kpis.users} color="#9C27B0" />
+            </div>
+
+            {/* 1.5 Monthly Summary */}
+            <div style={{ marginBottom: '32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 600, margin: 0 }}>Estatísticas do Mês</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button onClick={() => setMonthlyDate(subMonths(monthlyDate, 1))} className="btn-icon"><ChevronLeft size={20} /></button>
+                        <span style={{ fontSize: '1rem', fontWeight: 600, textTransform: 'capitalize', minWidth: '150px', textAlign: 'center' }}>
+                            {format(monthlyDate, 'MMMM yyyy', { locale: ptBR })}
+                        </span>
+                        <button onClick={() => setMonthlyDate(addMonths(monthlyDate, 1))} className="btn-icon"><ChevronRight size={20} /></button>
+                    </div>
+                </div>
+
+                {loadingMonthly ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>Carregando...</div>
+                ) : monthlyStats ? (
+                    <div className="monthly-stats-grid">
+                        {/* Total Card */}
+                        <div style={{ background: '#E3F2FD', padding: '25px', borderRadius: '16px', textAlign: 'center', border: '1px solid #BBDEFB' }}>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1565C0', marginBottom: '10px' }}>TOTAL NO MÊS</div>
+                            <div style={{ fontSize: '3rem', fontWeight: 800, color: '#0D47A1' }}>{monthlyStats.total || 0}</div>
+                            <div style={{ fontSize: '0.9rem', color: '#1E88E5' }}>aulas atribuídas</div>
+                        </div>
+
+                        {/* By Period */}
+                        <div style={{ background: 'var(--bg-primary)', padding: '25px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                            <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem' }}>Por Período</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                <PeriodRow label="Manhã" count={monthlyStats.byPeriod['Manhã']} icon="☀️" color="#FBC02D" />
+                                <PeriodRow label="Tarde" count={monthlyStats.byPeriod['Tarde']} icon="🌤️" color="#FB8C00" />
+                                <PeriodRow label="Noite" count={monthlyStats.byPeriod['Noite']} icon="🌙" color="#5E35B1" />
+                            </div>
+                        </div>
+
+                        {/* Top Classes */}
+                        <div style={{ background: 'var(--bg-primary)', padding: '25px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                            <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem' }}>Top 5 Turmas</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {Object.entries(monthlyStats.byClass || {})
+                                    .sort(([, a], [, b]) => b - a)
+                                    .slice(0, 5)
+                                    .map(([key, value]) => (
+                                        <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
+                                            <span style={{ fontWeight: 500 }}>{key}</span>
+                                            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{value}</span>
+                                        </div>
+                                    ))}
+                                {Object.keys(monthlyStats.byClass || {}).length === 0 && <span style={{ color: '#999' }}>Nenhuma aula registra da.</span>}
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
             </div>
 
             {/* 2. Charts Row 1 */}
@@ -259,6 +314,18 @@ function ChartCard({ title, children }) {
         }}>
             <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-primary)', fontSize: '1.2rem' }}>{title}</h3>
             {children}
+        </div>
+    );
+}
+
+function PeriodRow({ label, count, icon, color }) {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.2rem' }}>{icon}</span>
+                <span style={{ fontWeight: 500 }}>{label}</span>
+            </div>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: color }}>{count || 0}</div>
         </div>
     );
 }

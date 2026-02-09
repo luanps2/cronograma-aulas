@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, Settings, BookOpen, Users, Monitor, GraduationCap, ChevronLeft, ChevronRight, List as ListIcon, LayoutGrid } from 'lucide-react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -25,10 +25,29 @@ export default function CalendarPage({ user, onLogout }) {
     const [selectedLesson, setSelectedLesson] = useState(null);
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: null });
 
+    // Filter states
+    const [allClasses, setAllClasses] = useState([]);
+    const [allUCs, setAllUCs] = useState([]);
+    const [filters, setFilters] = useState({ turma: '', ucId: '' });
+
     useEffect(() => {
         fetchLessons();
         fetchCourses();
+        fetchFilterOptions();
     }, [currentDate]);
+
+    const fetchFilterOptions = async () => {
+        try {
+            const [classesRes, ucsRes] = await Promise.all([
+                axios.get(`${API_BASE_URL}/api/settings/classes`),
+                axios.get(`${API_BASE_URL}/api/settings/ucs`)
+            ]);
+            setAllClasses(classesRes.data);
+            setAllUCs(ucsRes.data);
+        } catch (error) {
+            console.error('Error fetching filter options:', error);
+        }
+    };
 
     const handleDateClick = (date) => {
         setSelectedDateForModal(date);
@@ -130,8 +149,14 @@ export default function CalendarPage({ user, onLogout }) {
                 {/* Filters Section - Always first */}
                 <div className="filters-section" style={{ background: 'var(--bg-primary)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 500 }}>Filtrar por:</span>
-                    <select style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}><option>Todas as turmas</option></select>
-                    <select style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}><option>Todas as UCs</option></select>
+                    <select value={filters.turma} onChange={(e) => setFilters(prev => ({ ...prev, turma: e.target.value }))} style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}>
+                        <option value="">Todas as turmas</option>
+                        {allClasses.map(cls => <option key={cls.id || cls._id} value={cls.name}>{cls.name}</option>)}
+                    </select>
+                    <select value={filters.ucId} onChange={(e) => setFilters(prev => ({ ...prev, ucId: e.target.value }))} style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}>
+                        <option value="">Todas as UCs</option>
+                        {allUCs.map(uc => <option key={uc.id} value={uc.id}>{uc.name}</option>)}
+                    </select>
 
                     <div style={{ flex: 1 }}></div>
                     <div style={{ display: 'flex', gap: '0', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
@@ -165,12 +190,22 @@ export default function CalendarPage({ user, onLogout }) {
 
                                 {calendarDays.map((dayItem, idx) => {
                                     const isCurrentMonth = isSameMonth(dayItem, monthStart);
-                                    const dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
+                                    let dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
+
+                                    // Apply filters
+                                    if (filters.turma) {
+                                        dayLessons = dayLessons.filter(l => l.turma === filters.turma);
+                                    }
+                                    if (filters.ucId) {
+                                        dayLessons = dayLessons.filter(l => String(l.ucId) === String(filters.ucId));
+                                    }
+
+                                    const isTodayDate = isToday(dayItem);
 
                                     return (
                                         <div
                                             key={idx}
-                                            className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''}`}
+                                            className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${isTodayDate ? 'calendar-day-today' : ''}`}
                                             onClick={() => handleDateClick(dayItem)}
                                             style={{ cursor: 'pointer' }}
                                         >
@@ -187,7 +222,16 @@ export default function CalendarPage({ user, onLogout }) {
                         ) : (
                             <div style={{ border: '1px solid var(--border-color)', borderTop: 'none', background: 'var(--bg-primary)', borderRadius: '0 0 12px 12px' }}>
                                 {calendarDays.filter(d => isSameMonth(d, monthStart)).map((dayItem, idx) => {
-                                    const dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
+                                    let dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
+
+                                    // Apply filters
+                                    if (filters.turma) {
+                                        dayLessons = dayLessons.filter(l => l.turma === filters.turma);
+                                    }
+                                    if (filters.ucId) {
+                                        dayLessons = dayLessons.filter(l => String(l.ucId) === String(filters.ucId));
+                                    }
+
                                     if (dayLessons.length === 0) return null;
                                     return (
                                         <div key={idx} style={{ padding: '15px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '20px', flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
@@ -361,13 +405,22 @@ function LessonCard({ lesson, horizontal, onClick }) {
                 minHeight: '80px'
             }}
         >
+            {/* 1. PERÍODO (first) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
                 {lesson.period === 'Noite' ? <span style={{ fontSize: '0.8rem' }}>🌙</span> : <span style={{ fontSize: '0.8rem' }}>☀️</span>}
                 <strong style={{ fontSize: '0.75rem' }}>{lesson.period}</strong>
             </div>
-            <div style={{ fontWeight: '700', fontSize: '0.85rem', lineHeight: '1.2' }}>{lesson.turma}</div>
-            <div style={{ fontSize: '0.75rem', lineHeight: '1.2', margin: '2px 0' }}>{lesson.uc}</div>
+
+            {/* 2. LABORATÓRIO (second) */}
             <div style={{ fontSize: '0.7rem', opacity: 0.9, fontWeight: '600' }}>{lesson.lab}</div>
+
+            {/* 3. TURMA (third) */}
+            <div style={{ fontWeight: '700', fontSize: '0.85rem', lineHeight: '1.2' }}>{lesson.turma}</div>
+
+            {/* 4. UC (fourth - MANDATORY, always visible) */}
+            <div style={{ fontSize: '0.75rem', lineHeight: '1.2', margin: '2px 0', fontWeight: '500' }}>{lesson.uc}</div>
+
+            {/* 5. DESCRIÇÃO (last, optional) */}
             {lesson.description && (
                 <div style={{
                     width: '100%',
