@@ -25,46 +25,56 @@ const generateToken = (user) => {
 router.post('/register', async (req, res) => {
     try {
         const { email, senha, password, name } = req.body;
-
         const finalPassword = senha || password;
+
+        console.log(`[AUTH] POST /register - ${email || 'no email'}`);
 
         if (!email || !finalPassword) {
             return res.status(400).json({ error: 'Email e senha são obrigatórios.' });
         }
 
-        const existingUser = (
-            await db.query('SELECT * FROM users WHERE email = $1', [email])
-        ).rows[0];
+        // DATABASE OPERATIONS - ISOLATED TRY/CATCH
+        try {
+            const existingUser = (
+                await db.query('SELECT * FROM users WHERE email = $1', [email])
+            ).rows[0];
 
-        if (existingUser) {
-            if (existingUser.provider !== 'local') {
-                return res.status(409).json({
-                    error: `Este email já está vinculado ao login com ${existingUser.provider}.`
-                });
+            if (existingUser) {
+                if (existingUser.provider !== 'local') {
+                    return res.status(409).json({
+                        error: `Este email já está vinculado ao login com ${existingUser.provider}.`
+                    });
+                }
+                return res.status(409).json({ error: 'Usuário já existe.' });
             }
-            return res.status(409).json({ error: 'Usuário já existe.' });
+
+            const hashedPassword = await bcrypt.hash(finalPassword, 10);
+            const userName = name || email.split('@')[0];
+
+            const result = await db.query(
+                `INSERT INTO users (email, password, name, provider)
+                 VALUES ($1, $2, $3, 'local')
+                 RETURNING id, email, name`,
+                [email, hashedPassword, userName]
+            );
+
+            const user = result.rows[0];
+            const token = generateToken(user);
+
+            res.status(201).json({ token, user });
+
+        } catch (dbError) {
+            console.error('❌ Database Error (Register):', dbError);
+            return res.status(500).json({
+                error: 'Erro ao acessar banco de dados. Tente novamente.',
+                details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+            });
         }
 
-        const hashedPassword = await bcrypt.hash(finalPassword, 10);
-        const userName = name || email.split('@')[0];
-
-        const result = await db.query(
-            `INSERT INTO users (email, password, name, provider)
-       VALUES ($1, $2, $3, 'local')
-       RETURNING id, email, name`,
-            [email, hashedPassword, userName]
-        );
-
-        const user = result.rows[0];
-        const token = generateToken(user);
-
-        res.status(201).json({ token, user });
-
     } catch (error) {
-        console.error('Register Error:', error);
-        // Retorna 500 JSON com detalhe seguro em dev
+        console.error('❌ Unexpected Register Error:', error);
         res.status(500).json({
-            error: 'Erro interno no servidor ao registrar usuário.',
+            error: 'Erro inesperado no servidor.',
             details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
@@ -78,13 +88,24 @@ router.post('/login', async (req, res) => {
         const { email, senha, password } = req.body;
         const finalPassword = senha || password;
 
+        console.log(`[AUTH] POST /login - ${email || 'no email'}`);
+
         if (!email || !finalPassword) {
             return res.status(400).json({ error: 'Email e senha são obrigatórios.' });
         }
 
-        const user = (
-            await db.query('SELECT * FROM users WHERE email = $1', [email])
-        ).rows[0];
+        // DATABASE OPERATIONS - ISOLATED TRY/CATCH
+        let user;
+        try {
+            const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+            user = result.rows[0];
+        } catch (dbError) {
+            console.error('❌ Database Error (Login - SELECT):', dbError);
+            return res.status(500).json({
+                error: 'Erro ao acessar banco de dados. Tente novamente.',
+                details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+            });
+        }
 
         if (!user) {
             return res.status(401).json({ error: 'Credenciais inválidas.' });
@@ -92,7 +113,15 @@ router.post('/login', async (req, res) => {
 
         if (user.provider !== 'local') {
             return res.status(403).json({
-                error: `Esta conta utiliza login com ${user.provider}.`
+                error: `Esta conta utiliza login com ${user.provider}. Use o botão correspondente para entrar.`
+            });
+        }
+
+        // CRITICAL: Prevent bcrypt from receiving NULL/undefined password
+        if (!user.password || user.password === 'social_login_placeholder') {
+            console.error(`⚠️  User ${user.email} has no local password (provider: ${user.provider})`);
+            return res.status(403).json({
+                error: `Esta conta foi criada com ${user.provider || 'login social'}. Não é possível usar email/senha.`
             });
         }
 
@@ -113,9 +142,9 @@ router.post('/login', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Login Error:', error);
+        console.error('❌ Unexpected Login Error:', error);
         res.status(500).json({
-            error: 'Erro interno no servidor ao realizar login.',
+            error: 'Erro inesperado no servidor.',
             details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
@@ -127,6 +156,9 @@ router.post('/login', async (req, res) => {
 router.post('/google', async (req, res) => {
     try {
         const { credential } = req.body;
+
+        console.log(`[AUTH] POST /google - credential ${credential ? 'present' : 'missing'}`);
+
         if (!credential) {
             return res.status(400).json({ error: 'Token do Google ausente.' });
         }
@@ -140,8 +172,9 @@ router.post('/google', async (req, res) => {
                 audience: process.env.GOOGLE_CLIENT_ID
             });
             payload = ticket.getPayload();
+            console.log(`✅ Google token verified for: ${payload.email}`);
         } catch (verifyError) {
-            console.error('Google Verify Error:', verifyError);
+            console.error('❌ Google Verify Error:', verifyError.message);
             return res.status(401).json({ error: 'Token Google Inválido ou Expirado.' });
         }
 

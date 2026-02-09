@@ -124,11 +124,29 @@ async function ensurePool() {
 }
 
 /**
- * Execute query
+ * Execute query with retry logic
  */
-async function query(text, params) {
-    await ensurePool();
-    return pool.query(text, params);
+async function query(text, params, retries = 3) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            await ensurePool();
+            return await pool.query(text, params);
+        } catch (error) {
+            console.error(`❌ Query attempt ${attempt}/${retries} failed:`, error.message);
+
+            if (attempt === retries) {
+                throw new Error(`Database query failed after ${retries} attempts: ${error.message}`);
+            }
+
+            // Exponential backoff: 100ms, 200ms, 400ms
+            const delay = 100 * Math.pow(2, attempt - 1);
+            console.log(`   Retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+
+            // Reset pool to force reconnection
+            pool = null;
+        }
+    }
 }
 
 /**
