@@ -275,14 +275,80 @@ select {
   display: block;
 }
 
-@media (max-width: 768px) {
+/* ===================================
+   MOBILE-FIRST RESPONSIVE STYLES
+   =================================== */
+
+/* Small phones (< 640px) */
+@media (max-width: 640px) {
   .hide-mobile {
-    display: none;
+    display: none !important;
+  }
+
+  /* Calendar Grid - Mobile optimized */
+  .calendar-grid {
+    font-size: 0.85rem;
+  }
+
+  .calendar-day-header {
+    padding: 8px 4px;
+    font-size: 0.7rem;
   }
 
   .calendar-day {
-    min-height: 80px;
+    min-height: 100px;
     padding: 4px;
+  }
+
+  .day-number {
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+  }
+
+  /* Event Cards - Uniform height and better readability */
+  .event-card {
+    min-height: 70px !important;
+    max-height: 70px !important;
+    padding: 4px !important;
+    font-size: 0.7rem !important;
+    overflow: hidden;
+  }
+
+  .event-card strong {
+    font-size: 0.65rem !important;
+  }
+
+  .event-card div {
+    line-height: 1.1 !important;
+  }
+
+  /* Day events container */
+  .day-events {
+    gap: 3px;
+  }
+}
+
+/* Tablets (641px - 900px) */
+@media (min-width: 641px) and (max-width: 900px) {
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .calendar-day {
+    min-height: 100px;
+    padding: 6px;
+  }
+
+  .event-card {
+    min-height: 75px;
+    padding: 5px;
+  }
+}
+
+/* Desktop (> 900px) */
+@media (min-width: 901px) {
+  .hide-mobile {
+    display: block !important;
   }
 }
 

@@ -63,22 +63,24 @@ export default function Header({ user, onLogout, onNavigateHome }) {
             backgroundColor: 'var(--bg-primary)',
             borderBottom: '1px solid var(--border-color)',
             padding: '0 20px',
-            height: '80px', // Increased height for bigger elements
+            height: '80px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             position: 'sticky',
             top: 0,
             zIndex: 1000,
-            boxShadow: 'var(--card-shadow)'
-        }}>
+            boxShadow: 'var(--card-shadow)',
+            width: '100%',
+            boxSizing: 'border-box'
+        }} className="main-header">
             {/* Left: Logo & Branding */}
             <div
                 onClick={onNavigateHome}
                 style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer', marginRight: '20px' }}
                 title="Ir para o Início"
             >
-                <img src="/senac-logo.png" alt="Senac" style={{ height: '48px' }} /> {/* Increased Size */}
+                <img src="/senac-logo.png" alt="Senac" style={{ height: '48px' }} />
                 <div style={{ height: '32px', width: '1px', background: 'var(--border-color)', display: 'none', md: 'block' }}></div>
                 <h1 style={{
                     fontSize: '1rem',
@@ -92,8 +94,26 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                 </h1>
             </div>
 
-            {/* Center: Dynamic Links */}
-            <div className="header-links-area hide-mobile" style={{ flex: 1, display: 'flex', gap: '5px', justifyContent: 'center' }}>
+            {/* Center: Dynamic Links + Dashboard */}
+            <div className="header-links-area hide-mobile" style={{ flex: 1, display: 'flex', gap: '5px', justifyContent: 'center', alignItems: 'center' }}>
+                {/* Dashboard Button - NOW VISIBLE */}
+                <button
+                    onClick={() => navigate('/dashboard')}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '8px 16px', borderRadius: '6px',
+                        fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)',
+                        backgroundColor: 'transparent',
+                        transition: '0.2s',
+                        border: 'none',
+                        cursor: 'pointer'
+                    }}
+                    className="nav-link-btn"
+                    title="Ir para Dashboard"
+                >
+                    <LayoutGrid size={16} /> Dashboard
+                </button>
+
                 {CATEGORY_ORDER.map(cat => {
                     const links = groupedLinks[cat];
                     if (!links || links.length === 0) return null;
@@ -150,8 +170,6 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                         </div>
                     );
                 })}
-
-                {/* Removed Dashboard and Settings buttons from here as they are now in the User Menu */}
             </div>
 
             {/* Right: Actions & User */}
@@ -278,9 +296,23 @@ export default function Header({ user, onLogout, onNavigateHome }) {
             />
 
             <style>{`
+                .main-header {
+                    width: 100% !important;
+                }
+
                 @media (max-width: 900px) {
                     .hide-mobile { display: none !important; }
+
+                    .main-header {
+                        height: 60px !important;
+                        padding: 0 10px !important;
+                    }
+
+                    .main-header img {
+                        height: 36px !important;
+                    }
                 }
+
                 .btn-icon { background: none; border: none; cursor: pointer; padding: 10px; border-radius: 50%; transition: background 0.2s; }
                 .btn-icon:hover { background: var(--bg-secondary); }
                 .nav-link-btn:hover { background-color: var(--bg-secondary) !important; color: var(--text-primary) !important; }

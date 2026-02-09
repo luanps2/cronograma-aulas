@@ -128,8 +128,10 @@ cp .env.example .env    # Linux/Mac
 ```
 Edite o arquivo `.env` gerado na pasta `server` e preencha:
 - `DATABASE_URL`: Sua string de conexão do Supabase (Transaction Pooler).
+- **`IMPORTANTE:` Em produção com Render, usar Supabase `Session Pooler` (IPv4)**
 - `JWT_SECRET`: Crie uma senha forte.
 - `GOOGLE_CLIENT_ID`: ID do cliente OAuth do Google.
+
 
 **Passo 3: Configurar Frontend**
 ```bash

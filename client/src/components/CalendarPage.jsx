@@ -126,94 +126,99 @@ export default function CalendarPage({ user, onLogout }) {
 
     return (
         <>
-            <div style={{ background: 'var(--bg-primary)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 500 }}>Filtrar por:</span>
-                <select style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}><option>Todas as turmas</option></select>
-                <select style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}><option>Todas as UCs</option></select>
+            <div className="calendar-page-container">
+                {/* Filters Section - Always first */}
+                <div className="filters-section" style={{ background: 'var(--bg-primary)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 500 }}>Filtrar por:</span>
+                    <select style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}><option>Todas as turmas</option></select>
+                    <select style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}><option>Todas as UCs</option></select>
 
-                <div style={{ flex: 1 }}></div>
-                <div style={{ display: 'flex', gap: '0', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-                    <button
-                        onClick={() => setCalendarViewMode('grid')}
-                        style={{ padding: '8px 12px', background: calendarViewMode === 'grid' ? 'var(--bg-secondary)' : 'var(--bg-primary)', color: calendarViewMode === 'grid' ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
-                        <LayoutGrid size={18} />
-                    </button>
-                    <button
-                        onClick={() => setCalendarViewMode('list')}
-                        style={{ padding: '8px 12px', background: calendarViewMode === 'list' ? 'var(--bg-secondary)' : 'var(--bg-primary)', color: calendarViewMode === 'list' ? 'var(--text-secondary)' : 'var(--text-tertiary)', borderLeft: '1px solid var(--border-color)' }}>
-                        <ListIcon size={18} />
-                    </button>
+                    <div style={{ flex: 1 }}></div>
+                    <div style={{ display: 'flex', gap: '0', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+                        <button
+                            onClick={() => setCalendarViewMode('grid')}
+                            style={{ padding: '8px 12px', background: calendarViewMode === 'grid' ? 'var(--bg-secondary)' : 'var(--bg-primary)', color: calendarViewMode === 'grid' ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
+                            <LayoutGrid size={18} />
+                        </button>
+                        <button
+                            onClick={() => setCalendarViewMode('list')}
+                            style={{ padding: '8px 12px', background: calendarViewMode === 'list' ? 'var(--bg-secondary)' : 'var(--bg-primary)', color: calendarViewMode === 'list' ? 'var(--text-secondary)' : 'var(--text-tertiary)', borderLeft: '1px solid var(--border-color)' }}>
+                            <ListIcon size={18} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Calendar Section - Order 1 on mobile, 2 on desktop */}
+                <div className="calendar-section">
+                    <div style={{ background: 'var(--bg-primary)', borderRadius: '12px 12px 0 0', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderBottom: 'none' }}>
+                        <button className="btn-outline" onClick={prevMonth} style={{ width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}><ChevronLeft /></button>
+                        <h2 style={{ fontSize: '1.5rem', textTransform: 'capitalize' }}>{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</h2>
+                        <button className="btn-outline" onClick={nextMonth} style={{ width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}><ChevronRight /></button>
+                    </div>
+
+                    {
+                        calendarViewMode === 'grid' ? (
+                            <div className="calendar-grid">
+                                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                                    <div key={day} className="calendar-day-header">{day}</div>
+                                ))}
+
+                                {calendarDays.map((dayItem, idx) => {
+                                    const isCurrentMonth = isSameMonth(dayItem, monthStart);
+                                    const dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
+
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''}`}
+                                            onClick={() => handleDateClick(dayItem)}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            <span className="day-number">{format(dayItem, 'd')}</span>
+                                            <div className="day-events">
+                                                {dayLessons.map((lesson, lIdx) => (
+                                                    <LessonCard key={lIdx} lesson={lesson} onClick={(e) => handleLessonSelect(lesson, e)} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div style={{ border: '1px solid var(--border-color)', borderTop: 'none', background: 'var(--bg-primary)', borderRadius: '0 0 12px 12px' }}>
+                                {calendarDays.filter(d => isSameMonth(d, monthStart)).map((dayItem, idx) => {
+                                    const dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
+                                    if (dayLessons.length === 0) return null;
+                                    return (
+                                        <div key={idx} style={{ padding: '15px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '20px', flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
+                                            <div style={{ minWidth: '60px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>{format(dayItem, 'd')}</div>
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{format(dayItem, 'EEE', { locale: ptBR })}</div>
+                                            </div>
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                {dayLessons.map((lesson, lIdx) => (
+                                                    <LessonCard key={lIdx} lesson={lesson} horizontal onClick={(e) => handleLessonSelect(lesson, e)} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                                {lessons.filter(l => isSameMonth(l.date, monthStart)).length === 0 && (
+                                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>Nenhuma aula agendada para este mês.</div>
+                                )}
+                            </div>
+                        )
+                    }
+                </div>
+
+                {/* Shortcut Cards Section - Order 2 on mobile, 1 on desktop */}
+                <div className="shortcuts-section">
+                    <ShortcutCard icon={<GraduationCap color="#5E35B1" size={20} />} label="Curso" color="#EDE7F6" onClick={() => openQuickAdd('courses')} />
+                    <ShortcutCard icon={<Users color="#3949AB" size={20} />} label="Turma" color="#E8EAF6" onClick={() => openQuickAdd('classes')} />
+                    <ShortcutCard icon={<BookOpen color="#00897B" size={20} />} label="UC" color="#E0F2F1" onClick={() => openQuickAdd('ucs')} />
+                    <ShortcutCard icon={<Monitor color="#0277BD" size={20} />} label="Lab" color="#E1F5FE" onClick={() => openQuickAdd('labs')} />
                 </div>
             </div>
-
-
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-                <ShortcutCard icon={<GraduationCap color="#5E35B1" size={24} />} label="Curso" color="#EDE7F6" onClick={() => openQuickAdd('courses')} />
-                <ShortcutCard icon={<Users color="#3949AB" size={24} />} label="Turma" color="#E8EAF6" onClick={() => openQuickAdd('classes')} />
-                <ShortcutCard icon={<BookOpen color="#00897B" size={24} />} label="UC" color="#E0F2F1" onClick={() => openQuickAdd('ucs')} />
-                <ShortcutCard icon={<Monitor color="#0277BD" size={24} />} label="Lab" color="#E1F5FE" onClick={() => openQuickAdd('labs')} />
-            </div>
-
-            <div style={{ background: 'var(--bg-primary)', borderRadius: '12px 12px 0 0', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderBottom: 'none' }}>
-                <button className="btn-outline" onClick={prevMonth} style={{ width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}><ChevronLeft /></button>
-                <h2 style={{ fontSize: '1.5rem', textTransform: 'capitalize' }}>{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</h2>
-                <button className="btn-outline" onClick={nextMonth} style={{ width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}><ChevronRight /></button>
-            </div>
-
-            {
-                calendarViewMode === 'grid' ? (
-                    <div className="calendar-grid">
-                        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                            <div key={day} className="calendar-day-header">{day}</div>
-                        ))}
-
-                        {calendarDays.map((dayItem, idx) => {
-                            const isCurrentMonth = isSameMonth(dayItem, monthStart);
-                            const dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
-
-                            return (
-                                <div
-                                    key={idx}
-                                    className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''}`}
-                                    onClick={() => handleDateClick(dayItem)}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    <span className="day-number">{format(dayItem, 'd')}</span>
-                                    <div className="day-events">
-                                        {dayLessons.map((lesson, lIdx) => (
-                                            <LessonCard key={lIdx} lesson={lesson} onClick={(e) => handleLessonSelect(lesson, e)} />
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <div style={{ border: '1px solid var(--border-color)', borderTop: 'none', background: 'var(--bg-primary)', borderRadius: '0 0 12px 12px' }}>
-                        {calendarDays.filter(d => isSameMonth(d, monthStart)).map((dayItem, idx) => {
-                            const dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
-                            if (dayLessons.length === 0) return null;
-                            return (
-                                <div key={idx} style={{ padding: '15px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '20px', flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
-                                    <div style={{ minWidth: '60px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>{format(dayItem, 'd')}</div>
-                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{format(dayItem, 'EEE', { locale: ptBR })}</div>
-                                    </div>
-                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        {dayLessons.map((lesson, lIdx) => (
-                                            <LessonCard key={lIdx} lesson={lesson} horizontal onClick={(e) => handleLessonSelect(lesson, e)} />
-                                        ))}
-                                    </div>
-                                </div>
-                            )
-                        })}
-                        {lessons.filter(l => isSameMonth(l.date, monthStart)).length === 0 && (
-                            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>Nenhuma aula agendada para este mês.</div>
-                        )}
-                    </div>
-                )
-            }
 
             <ImportModal
                 isOpen={isImportModalOpen}
@@ -246,6 +251,54 @@ export default function CalendarPage({ user, onLogout }) {
                 confirmText={confirmModal.confirmText || 'Confirmar'}
                 onConfirm={confirmModal.onConfirm}
             />
+
+            <style>{`
+                .calendar-page-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                }
+
+                .filters-section {
+                    order: 1;
+                }
+
+                .calendar-section {
+                    order: 2;
+                }
+
+                .shortcuts-section {
+                    order: 3;
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 20px;
+                }
+
+                /* Mobile: Calendar first, shortcuts after */
+                @media (max-width: 640px) {
+                    .calendar-section {
+                        order: 2;
+                    }
+
+                    .shortcuts-section {
+                        order: 3;
+                        grid-template-columns: repeat(2, 1fr);
+                        gap: 10px;
+                        margin-bottom: 20px;
+                    }
+                }
+
+                /* Desktop: Keep original order */
+                @media (min-width: 641px) {
+                    .shortcuts-section {
+                        order: 2;
+                    }
+
+                    .calendar-section {
+                        order: 3;
+                    }
+                }
+            `}</style>
         </>
     )
 }
@@ -338,6 +391,7 @@ function ShortcutCard({ icon, label, color, onClick }) {
     return (
         <div
             onClick={onClick}
+            className="shortcut-card"
             style={{
                 background: 'var(--bg-primary)',
                 padding: '24px',
@@ -355,6 +409,24 @@ function ShortcutCard({ icon, label, color, onClick }) {
         >
             <div style={{ padding: '12px', borderRadius: '12px', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</div>
             <span style={{ fontWeight: 600, fontSize: '1.2rem', color: 'var(--text-primary)' }}>{label}</span>
+
+            <style>{`
+                @media (max-width: 640px) {
+                    .shortcut-card {
+                        padding: 12px !important;
+                        gap: 8px !important;
+                        min-height: 60px;
+                    }
+
+                    .shortcut-card > div:first-child {
+                        padding: 8px !important;
+                    }
+
+                    .shortcut-card span {
+                        font-size: 0.9rem !important;
+                    }
+                }
+            `}</style>
         </div>
     )
 }
