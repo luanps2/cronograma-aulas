@@ -1,49 +1,55 @@
 const { Pool } = require('pg');
-const { parse } = require('pg-connection-string');
+const dns = require('dns').promises;
 require('dotenv').config();
 
 let pool = null;
 let isConnecting = false;
 
 /**
- * Parse DATABASE_URL and create explicit config
- * This bypasses pg's internal DNS resolution that causes IPv6 issues
+ * Resolve hostname to IPv4 address using OS resolver
+ * This is the ONLY way to force IPv4 on Render
  */
-function createPoolConfig() {
-    const connectionString = process.env.DATABASE_URL;
-
-    if (!connectionString) {
-        throw new Error('DATABASE_URL is not set in environment variables');
+async function resolveToIPv4(hostname) {
+    try {
+        console.log(`🔍 Resolvendo "${hostname}" para IPv4...`);
+        const { address } = await dns.lookup(hostname, { family: 4 });
+        console.log(`✅ Resolvido: ${hostname} -> ${address}`);
+        return address;
+    } catch (error) {
+        console.error(`❌ Falha ao resolver ${hostname}:`, error.message);
+        throw new Error(`Não foi possível resolver ${hostname} para IPv4: ${error.message}`);
     }
-
-    // Parse the connection string into components
-    const config = parse(connectionString);
-
-    // Build explicit config object (avoids pg's DNS resolution)
-    return {
-        host: config.host,
-        port: config.port || 5432,
-        database: config.database,
-        user: config.user,
-        password: config.password,
-        ssl: process.env.NODE_ENV === 'production'
-            ? { rejectUnauthorized: false }
-            : false,
-        connectionTimeoutMillis: 10000,
-        idleTimeoutMillis: 30000,
-        max: 20,
-        allowExitOnIdle: true
-    };
 }
 
 /**
- * Initialize pool (lazy - only when first query happens)
+ * Parse DATABASE_URL and replace hostname with IPv4 address
+ */
+async function buildIPv4ConnectionString(connectionString) {
+    // Parse URL
+    const url = new URL(connectionString);
+    const originalHost = url.hostname;
+
+    // Skip localhost
+    if (originalHost === 'localhost' || originalHost === '127.0.0.1') {
+        return connectionString;
+    }
+
+    // Force IPv4 resolution
+    const ipv4Address = await resolveToIPv4(originalHost);
+
+    // Replace hostname with IP
+    url.hostname = ipv4Address;
+
+    return url.toString();
+}
+
+/**
+ * Create database pool with IPv4-forced connection
  */
 async function ensurePool() {
     if (pool) return pool;
 
     if (isConnecting) {
-        // Wait for existing connection attempt
         await new Promise(resolve => setTimeout(resolve, 100));
         return ensurePool();
     }
@@ -51,8 +57,28 @@ async function ensurePool() {
     isConnecting = true;
 
     try {
-        const config = createPoolConfig();
-        console.log(`🔄 Conectando ao PostgreSQL: ${config.host}:${config.port}/${config.database}`);
+        const originalConnectionString = process.env.DATABASE_URL;
+
+        if (!originalConnectionString) {
+            throw new Error('DATABASE_URL não configurado nas variáveis de ambiente');
+        }
+
+        console.log('🔄 Inicializando conexão PostgreSQL...');
+
+        // CRITICAL: Force IPv4 by resolving DNS manually
+        const ipv4ConnectionString = await buildIPv4ConnectionString(originalConnectionString);
+
+        // Create pool with IPv4 connection string
+        const config = {
+            connectionString: ipv4ConnectionString,
+            ssl: process.env.NODE_ENV === 'production'
+                ? { rejectUnauthorized: false }
+                : false,
+            connectionTimeoutMillis: 10000,
+            idleTimeoutMillis: 30000,
+            max: 20,
+            allowExitOnIdle: true
+        };
 
         pool = new Pool(config);
 
@@ -62,14 +88,14 @@ async function ensurePool() {
         client.release();
 
         console.log('✅ PostgreSQL conectado:', result.rows[0].now);
-        console.log(`   Versão: ${result.rows[0].version.split(' ')[0]} ${result.rows[0].version.split(' ')[1]}`);
 
-        // Handle errors
+        // Error handler
         pool.on('error', (err) => {
-            console.error('❌ Erro no pool do PostgreSQL:', err.message);
+            console.error('❌ Erro no pool PostgreSQL:', err.message);
         });
 
         return pool;
+
     } catch (error) {
         pool = null;
         console.error('❌ Falha ao conectar no PostgreSQL:', error.message);
@@ -110,6 +136,6 @@ async function testConnection() {
 
 module.exports = {
     query,
-    pool: getPool, // Returns promise to pool
+    pool: getPool,
     testConnection
 };
