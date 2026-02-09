@@ -282,15 +282,19 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                                 alt={user.name}
                                 style={{
                                     width: '48px', height: '48px',
+                                    minWidth: '48px', minHeight: '48px',
                                     borderRadius: '50%', objectFit: 'cover',
+                                    aspectRatio: '1/1',
                                     border: '2px solid #fff', boxShadow: '0 0 0 2px #E3F2FD'
                                 }}
                             />
                         ) : (
                             <div style={{
                                 width: '48px', height: '48px',
+                                minWidth: '48px', minHeight: '48px',
                                 borderRadius: '50%', background: '#E3F2FD', color: '#0277BD',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                aspectRatio: '1/1',
                                 fontWeight: 'bold', border: '2px solid #fff', boxShadow: '0 0 0 2px #E3F2FD',
                                 fontSize: '1.2rem'
                             }}>

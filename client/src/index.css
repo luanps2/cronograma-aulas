@@ -1,3 +1,13 @@
+* {
+  box-sizing: border-box;
+}
+
+body,
+html {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 :root {
   --bg-primary: #ffffff;
   --bg-secondary: #E3F2FD;
@@ -17,6 +27,13 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove outline from icon buttons */
+.btn-icon:focus,
+.btn-icon:active,
+button:focus-visible {
+  outline: none !important;
 }
 
 [data-theme='dark'] {
@@ -296,6 +313,7 @@ select {
   /* Calendar Grid - Mobile optimized */
   .calendar-grid {
     font-size: 0.85rem;
+    grid-template-rows: repeat(6, minmax(90px, auto));
   }
 
   .calendar-day-header {
@@ -305,7 +323,10 @@ select {
 
   .calendar-day {
     min-height: 100px;
+    max-height: 140px;
     padding: 4px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .day-number {
