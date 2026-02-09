@@ -46,12 +46,21 @@ app.use(cors({
 
 // Route for Health Check (Render/Uptime checks)
 app.get('/', async (req, res) => {
-    try {
-        await db.query('SELECT 1');
-        res.json({ status: 'ok', database: 'connected', timestamp: new Date() });
-    } catch (error) {
-        console.error('Health Check Failed:', error);
-        res.status(500).json({ status: 'error', database: 'disconnected', error: error.message });
+    const health = await db.testConnection();
+
+    if (health.connected) {
+        res.json({
+            status: 'ok',
+            database: 'connected',
+            timestamp: new Date()
+        });
+    } else {
+        res.status(503).json({
+            status: 'degraded',
+            database: 'disconnected',
+            error: health.error,
+            timestamp: new Date()
+        });
     }
 });
 
@@ -181,24 +190,30 @@ app.delete('/api/admin/clear-month', authMiddleware, (req, res) => {
     }
 });
 
-// Inicialização do Servidor (Bootstrap)
+// Inicialização do Servidor (Resiliente)
 const startServer = async () => {
+    console.log('🚀 Iniciando servidor...');
+    console.log(`   Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`   Porta: ${PORT}`);
+
+    // Start server immediately (DB connection is lazy)
+    app.listen(PORT, () => {
+        console.log(`✅ Servidor HTTP listening on port ${PORT}`);
+    });
+
+    // Test DB connection (non-blocking)
     try {
-        console.log('🚀 Iniciando servidor...');
-
-        // 1. Tenta conectar ao Banco de Dados (Bloqueante)
-        // Se falhar aqui, o app nem abre a porta, evitando "zumbis"
-        await db.connect();
-
-        // 2. Abre a porta apenas se o DB estiver OK
-        app.listen(PORT, () => {
-            console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
-            console.log(`✅ Ambiente: ${process.env.NODE_ENV || 'development'}`);
-        });
+        const health = await db.testConnection();
+        if (health.connected) {
+            console.log('✅ Banco de dados: Conectado');
+        } else {
+            console.warn('⚠️  Banco de dados: Não conectado no startup');
+            console.warn('   Conexão será estabelecida na primeira query');
+            console.warn(`   Erro: ${health.error}`);
+        }
     } catch (error) {
-        console.error('❌ Falha fatal na inicialização do servidor:', error.message);
-        console.error('   Verifique a conexão com o banco de dados e as variáveis de ambiente.');
-        process.exit(1); // Encerra o processo com erro para o Render reiniciar ou alertar
+        console.warn('⚠️  Não foi possível testar conexão no startup:', error.message);
+        console.warn('   Servidor continuará funcionando. DB será conectado sob demanda.');
     }
 };
 

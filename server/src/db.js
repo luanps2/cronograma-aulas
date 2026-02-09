@@ -1,83 +1,115 @@
 const { Pool } = require('pg');
-const path = require('path');
-const dns = require('dns').promises;
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
+const { parse } = require('pg-connection-string');
+require('dotenv').config();
 
 let pool = null;
+let isConnecting = false;
 
-const dbExports = {
-    pool: null,
-    query: async (text, params) => {
-        if (!pool) {
-            console.error('⚠️ DB Query attempted before initialization!'); // Warn if query called early
-            throw new Error('Database not initialized. Call connect() first.');
-        }
-        return pool.query(text, params);
-    },
-    connect: async () => {
-        if (pool) return pool;
+/**
+ * Parse DATABASE_URL and create explicit config
+ * This bypasses pg's internal DNS resolution that causes IPv6 issues
+ */
+function createPoolConfig() {
+    const connectionString = process.env.DATABASE_URL;
 
-        console.log('🔄 Inicializando conexão com o Banco de Dados (Tentativa IPv4)...');
-        let connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+        throw new Error('DATABASE_URL is not set in environment variables');
+    }
 
-        if (!connectionString) {
-            throw new Error('DATABASE_URL not set in environment variables');
-        }
+    // Parse the connection string into components
+    const config = parse(connectionString);
 
-        let config = {
-            connectionString,
-            ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-            connectionTimeoutMillis: 5000,
-            idleTimeoutMillis: 30000,
-            allowExitOnIdle: true
-        };
+    // Build explicit config object (avoids pg's DNS resolution)
+    return {
+        host: config.host,
+        port: config.port || 5432,
+        database: config.database,
+        user: config.user,
+        password: config.password,
+        ssl: process.env.NODE_ENV === 'production'
+            ? { rejectUnauthorized: false }
+            : false,
+        connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000,
+        max: 20,
+        allowExitOnIdle: true
+    };
+}
 
-        try {
-            // FORCE IPv4: Render often defaults to IPv6 which Supabase doesn't fully support on free tiers
-            // checks if we need to resolve
-            if (!connectionString.includes('localhost') && !connectionString.includes('127.0.0.1')) {
-                const url = new URL(connectionString);
-                const originalHost = url.hostname;
+/**
+ * Initialize pool (lazy - only when first query happens)
+ */
+async function ensurePool() {
+    if (pool) return pool;
 
-                console.log(`🔍 Resolvendo DNS IPv4 para: ${originalHost}`);
+    if (isConnecting) {
+        // Wait for existing connection attempt
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return ensurePool();
+    }
 
-                // dns.lookup with family: 4 matches standard getaddrinfo behavior
-                const { address } = await dns.lookup(originalHost, { family: 4 });
+    isConnecting = true;
 
-                if (address) {
-                    console.log(`✅ DNS Resolvido: ${originalHost} -> ${address}`);
+    try {
+        const config = createPoolConfig();
+        console.log(`🔄 Conectando ao PostgreSQL: ${config.host}:${config.port}/${config.database}`);
 
-                    // Rewrite config to use IP
-                    url.hostname = address;
-                    config.connectionString = url.toString();
-                } else {
-                    throw new Error(`Nenhum endereço IPv4 encontrado para ${originalHost}`);
-                }
-            }
-        } catch (dnsError) {
-            console.error('❌ Falha CRÍTICA na resolução DNS IPv4:', dnsError.message);
-            // FAIL FAST: Não tente conectar com o original se a resolução falhou, 
-            // pois isso causa o ENETUNREACH IPv6 que derruba o app.
-            throw dnsError;
-        }
-
-        // Initialize Pool with IPv4 Config
         pool = new Pool(config);
 
-        // Connectivity Test
-        try {
-            const client = await pool.connect();
-            const res = await client.query('SELECT NOW()');
-            client.release();
-            console.log('✅ Banco de Dados conectado com sucesso:', res.rows[0].now);
+        // Test connection
+        const client = await pool.connect();
+        const result = await client.query('SELECT NOW() as now, version() as version');
+        client.release();
 
-            dbExports.pool = pool;
-            return pool;
-        } catch (err) {
-            console.error('❌ Erro Crítico ao conectar no Pool do DB:', err.message);
-            throw err;
-        }
+        console.log('✅ PostgreSQL conectado:', result.rows[0].now);
+        console.log(`   Versão: ${result.rows[0].version.split(' ')[0]} ${result.rows[0].version.split(' ')[1]}`);
+
+        // Handle errors
+        pool.on('error', (err) => {
+            console.error('❌ Erro no pool do PostgreSQL:', err.message);
+        });
+
+        return pool;
+    } catch (error) {
+        pool = null;
+        console.error('❌ Falha ao conectar no PostgreSQL:', error.message);
+        throw error;
+    } finally {
+        isConnecting = false;
     }
-};
+}
 
-module.exports = dbExports;
+/**
+ * Execute query with automatic connection
+ */
+async function query(text, params) {
+    await ensurePool();
+    return pool.query(text, params);
+}
+
+/**
+ * Get pool for transactions
+ */
+async function getPool() {
+    await ensurePool();
+    return pool;
+}
+
+/**
+ * Test connection (for health checks)
+ */
+async function testConnection() {
+    try {
+        await ensurePool();
+        const result = await pool.query('SELECT 1 as ok');
+        return { connected: true, ok: result.rows[0].ok === 1 };
+    } catch (error) {
+        return { connected: false, error: error.message };
+    }
+}
+
+module.exports = {
+    query,
+    pool: getPool, // Returns promise to pool
+    testConnection
+};
