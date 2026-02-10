@@ -1,0 +1,17 @@
+{
+    "name": "Planejamento Acadêmico - Senac",
+    "short_name": "Senac Agenda",
+    "description": "Sistema de planejamento acadêmico do Senac",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#004A8D",
+    "icons": [
+        {
+            "src": "/senac-logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

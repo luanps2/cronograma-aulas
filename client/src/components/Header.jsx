@@ -381,9 +381,27 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                     }
                 }
 
-                .btn-icon { background: none; border: none; cursor: pointer; padding: 10px; border-radius: 50%; transition: background 0.2s; outline: none; }
-                .btn-icon:hover { background: var(--bg-secondary); }
-                .btn-icon:focus { outline: none; }
+                .btn-icon { 
+                    background: none; 
+                    border: none; 
+                    cursor: pointer; 
+                    padding: 10px; 
+                    border-radius: 50%; 
+                    transition: background 0.2s; 
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
+                .btn-icon:hover { 
+                    background: var(--bg-secondary); 
+                }
+                .btn-icon:focus { 
+                    outline: none !important; 
+                    box-shadow: none !important;
+                }
+                .btn-icon:active {
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
                 .nav-link-btn:hover { background-color: var(--bg-secondary) !important; color: var(--text-primary) !important; }
                 .dropdown-item:hover { background-color: var(--bg-secondary); }
             `}</style>

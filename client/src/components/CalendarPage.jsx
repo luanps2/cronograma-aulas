@@ -318,6 +318,63 @@ export default function CalendarPage({ user, onLogout }) {
                     gap: 20px;
                 }
 
+                .calendar-grid {
+                    display: grid;
+                    grid-template-columns: repeat(7, 1fr);
+                    border: 1px solid var(--border-color);
+                    border-top: none;
+                    background: var(--bg-primary);
+                    border-radius: 0 0 12px 12px;
+                    overflow: hidden;
+                }
+
+                .calendar-day {
+                    min-height: 120px;
+                    padding: 8px;
+                    border-right: 1px solid var(--border-color);
+                    border-bottom: 1px solid var(--border-color);
+                    position: relative;
+                    overflow-y: auto;
+                }
+
+                .calendar-day:nth-child(7n) {
+                    border-right: none;
+                }
+
+                .calendar-day-header {
+                    font-weight: 600;
+                    text-align: center;
+                    padding: 12px;
+                    background: var(--bg-secondary);
+                    border-right: 1px solid var(--border-color);
+                    border-bottom: 1px solid var(--border-color);
+                    color: var(--text-primary);
+                }
+
+                .calendar-day-header:nth-child(7n) {
+                    border-right: none;
+                }
+
+                .calendar-day-today {
+                    background: #E3F2FD !important;
+                    border: 2px solid #2196F3 !important;
+                }
+
+                .day-number {
+                    font-weight: 600;
+                    font-size: 0.95rem;
+                    display: inline-block;
+                    min-width: 24px;
+                    text-align: center;
+                }
+
+                .day-events {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    margin-top: 6px;
+                }
+
                 /* Mobile: Calendar first, shortcuts after */
                 @media (max-width: 640px) {
                     .calendar-section {
@@ -329,6 +386,20 @@ export default function CalendarPage({ user, onLogout }) {
                         grid-template-columns: repeat(2, 1fr);
                         gap: 10px;
                         margin-bottom: 20px;
+                    }
+
+                    .calendar-day {
+                        min-height: 100px;
+                        padding: 6px;
+                    }
+                    
+                    .day-number {
+                        font-size: 0.85rem;
+                    }
+                    
+                    .event-card {
+                        min-height: 70px !important;
+                        padding: 4px !important;
                     }
                 }
 

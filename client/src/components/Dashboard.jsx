@@ -112,8 +112,13 @@ export default function Dashboard() {
         <div style={{ padding: '24px', maxWidth: '1600px', margin: '0 auto' }}>
             <h1 style={{ color: 'var(--text-primary)', marginBottom: '24px', fontSize: '1.8rem' }}>Dashboard Acadêmico</h1>
 
-            {/* 1. KPIs - Row layout on mobile */}
-            <div className="dashboard-kpis">
+            {/* 1. KPIs - Row layout on desktop, 2 cols on mobile */}
+            <div className="dashboard-kpis" style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '20px',
+                marginBottom: '24px'
+            }}>
                 <KPICard icon={<BookOpen />} title="Cursos" value={currentStats.kpis.courses} color="#2196F3" />
                 <KPICard icon={<Layers />} title="Turmas" value={currentStats.kpis.classes} color="#4CAF50" />
                 <KPICard icon={<School />} title="UCs" value={currentStats.kpis.ucs} color="#FF9800" />
@@ -280,6 +285,20 @@ export default function Dashboard() {
                 </div>
             </div>
 
+            <style>{`
+                @media (max-width: 768px) {
+                    .dashboard-kpis {
+                        grid-template-columns: repeat(2, 1fr) !important;
+                        gap: 15px !important;
+                    }
+                }
+                
+                @media (min-width: 769px) {
+                    .dashboard-kpis {
+                        grid-template-columns: repeat(5, 1fr) !important;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
