@@ -1,73 +1,18 @@
 const { Pool } = require('pg');
-const dns = require('dns').promises;
 require('dotenv').config();
 
 let pool = null;
 let isConnecting = false;
 
-// Configure DNS to use public resolvers (Render's DNS may be blocking Supabase)
-dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
-
 /**
- * Resolve hostname to IPv4 using public DNS
- */
-async function resolveToIPv4(hostname) {
-    try {
-        console.log(`🔍 Resolvendo "${hostname}" com DNS público...`);
-
-        // Try lookup with IPv4 family
-        const addresses = await dns.resolve4(hostname);
-
-        if (addresses && addresses.length > 0) {
-            const ip = addresses[0];
-            console.log(`✅ Resolvido: ${hostname} -> ${ip}`);
-            return ip;
-        }
-
-        throw new Error('Nenhum endereço IPv4 retornado');
-    } catch (error) {
-        console.error(`❌ Falha DNS para ${hostname}:`, error.message);
-
-        // Fallback: try standard lookup
-        try {
-            console.log('   Tentando fallback com dns.lookup...');
-            const { address } = await dns.lookup(hostname, { family: 4 });
-            console.log(`✅ Fallback OK: ${hostname} -> ${address}`);
-            return address;
-        } catch (fallbackError) {
-            throw new Error(`DNS falhou: ${error.message}, Fallback: ${fallbackError.message}`);
-        }
-    }
-}
-
-/**
- * Build IPv4 connection string
- */
-async function buildIPv4ConnectionString(connectionString) {
-    const url = new URL(connectionString);
-    const originalHost = url.hostname;
-
-    // Skip localhost
-    if (originalHost === 'localhost' || originalHost === '127.0.0.1') {
-        return connectionString;
-    }
-
-    // Resolve to IPv4
-    const ipv4Address = await resolveToIPv4(originalHost);
-
-    // Replace hostname with IP
-    url.hostname = ipv4Address;
-
-    return url.toString();
-}
-
-/**
- * Create pool with IPv4 connection
+ * Create PostgreSQL pool (lazy initialization)
+ * CRITICAL: Uses Supabase Session Pooler (IPv4) - port 6543
  */
 async function ensurePool() {
     if (pool) return pool;
 
     if (isConnecting) {
+        // Wait for ongoing connection attempt
         await new Promise(resolve => setTimeout(resolve, 100));
         return ensurePool();
     }
@@ -75,41 +20,43 @@ async function ensurePool() {
     isConnecting = true;
 
     try {
-        const originalConnectionString = process.env.DATABASE_URL;
+        const connectionString = process.env.DATABASE_URL;
 
-        if (!originalConnectionString) {
-            throw new Error('DATABASE_URL não configurado');
+        if (!connectionString) {
+            throw new Error('DATABASE_URL não configurado nas variáveis de ambiente');
         }
 
-        console.log('🔄 Inicializando conexão PostgreSQL...');
+        console.log('🔄 Inicializando conexão PostgreSQL (Supabase Session Pooler)...');
 
-        // Force IPv4 by resolving DNS manually
-        const ipv4ConnectionString = await buildIPv4ConnectionString(originalConnectionString);
-
-        // Create pool
+        // Pool configuration for Supabase Session Pooler
         const config = {
-            connectionString: ipv4ConnectionString,
+            connectionString,
             ssl: process.env.NODE_ENV === 'production'
                 ? { rejectUnauthorized: false }
                 : false,
-            connectionTimeoutMillis: 10000,
+            connectionTimeoutMillis: 15000,  // Increased timeout for Render/Supabase
+            query_timeout: 30000,
             idleTimeoutMillis: 30000,
-            max: 20,
+            max: 10,  // Conservative pool size for serverless
+            min: 0,   // No minimum connections (serverless-friendly)
             allowExitOnIdle: true
         };
 
         pool = new Pool(config);
 
-        // Test connection
+        // Test connection immediately
         const client = await pool.connect();
-        const result = await client.query('SELECT NOW() as now');
+        const result = await client.query('SELECT NOW() as now, current_database() as db');
         client.release();
 
-        console.log('✅ PostgreSQL conectado:', result.rows[0].now);
+        console.log('✅ PostgreSQL conectado:');
+        console.log(`   Timestamp: ${result.rows[0].now}`);
+        console.log(`   Database: ${result.rows[0].db}`);
 
-        // Error handler
+        // Global error handler (prevent uncaught exceptions)
         pool.on('error', (err) => {
-            console.error('❌ Pool error:', err.message);
+            console.error('❌ Erro inesperado no pool PostgreSQL:', err.message);
+            // DO NOT crash the server - just log
         });
 
         return pool;
@@ -117,6 +64,7 @@ async function ensurePool() {
     } catch (error) {
         pool = null;
         console.error('❌ Falha ao conectar PostgreSQL:', error.message);
+        console.error('   Verifique DATABASE_URL e conectividade de rede');
         throw error;
     } finally {
         isConnecting = false;
@@ -124,33 +72,65 @@ async function ensurePool() {
 }
 
 /**
- * Execute query with retry logic
+ * Execute query with automatic retry
+ * @param {string} text - SQL query string
+ * @param {Array} params - Query parameters
+ * @param {number} retries - Number of retry attempts
  */
-async function query(text, params, retries = 3) {
+async function query(text, params, retries = 2) {
+    let lastError;
+
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
             await ensurePool();
-            return await pool.query(text, params);
-        } catch (error) {
-            console.error(`❌ Query attempt ${attempt}/${retries} failed:`, error.message);
 
-            if (attempt === retries) {
-                throw new Error(`Database query failed after ${retries} attempts: ${error.message}`);
+            // Double-check pool exists
+            if (!pool) {
+                throw new Error('Pool não foi inicializado');
             }
 
-            // Exponential backoff: 100ms, 200ms, 400ms
-            const delay = 100 * Math.pow(2, attempt - 1);
-            console.log(`   Retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+            return await pool.query(text, params);
 
-            // Reset pool to force reconnection
-            pool = null;
+        } catch (error) {
+            lastError = error;
+            console.error(`❌ Query falhou (tentativa ${attempt}/${retries}):`, error.message);
+
+            // Don't retry on validation errors
+            if (error.code === '23505') { // Unique constraint violation
+                throw error;
+            }
+            if (error.code === '23503') { // Foreign key violation
+                throw error;
+            }
+            if (error.code === '42P01') { // Table does not exist
+                throw error;
+            }
+
+            if (attempt < retries) {
+                // Reset pool to force reconnect on next attempt
+                if (pool) {
+                    try {
+                        await pool.end();
+                    } catch (endError) {
+                        console.error('   Erro ao fechar pool:', endError.message);
+                    }
+                }
+                pool = null;
+
+                // Exponential backoff: 200ms, 400ms
+                const delay = 200 * Math.pow(2, attempt - 1);
+                console.log(`   Reconectando em ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
         }
     }
+
+    // All retries failed
+    throw new Error(`Falha na query após ${retries} tentativas: ${lastError.message}`);
 }
 
 /**
- * Get pool
+ * Get pool instance (for advanced use cases)
  */
 async function getPool() {
     await ensurePool();
@@ -158,20 +138,54 @@ async function getPool() {
 }
 
 /**
- * Test connection
+ * Test connection health
  */
 async function testConnection() {
     try {
         await ensurePool();
         const result = await pool.query('SELECT 1 as ok');
-        return { connected: true, ok: result.rows[0].ok === 1 };
+        return {
+            connected: true,
+            ok: result.rows[0].ok === 1,
+            poolSize: pool.totalCount,
+            idleCount: pool.idleCount,
+            waitingCount: pool.waitingCount
+        };
     } catch (error) {
-        return { connected: false, error: error.message };
+        console.error('❌ Teste de conexão falhou:', error.message);
+        return {
+            connected: false,
+            error: error.message
+        };
     }
 }
+
+/**
+ * Graceful shutdown
+ */
+async function closePool() {
+    if (pool) {
+        console.log('🔄 Encerrando pool PostgreSQL...');
+        await pool.end();
+        pool = null;
+        console.log('✅ Pool encerrado');
+    }
+}
+
+// Graceful shutdown on process termination
+process.on('SIGTERM', async () => {
+    await closePool();
+    process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+    await closePool();
+    process.exit(0);
+});
 
 module.exports = {
     query,
     pool: getPool,
-    testConnection
+    testConnection,
+    closePool
 };

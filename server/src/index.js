@@ -1,15 +1,10 @@
 require('dotenv').config();
-const dns = require('dns');
-
-// Fix for Render/Supabase IPv6 connection issues (ENETUNREACH)
-if (dns.setDefaultResultOrder) {
-    dns.setDefaultResultOrder('ipv4first');
-}
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./db'); // Refatorado para PostgreSQL
+
 
 const authRoutes = require('./routes/auth');
 const settingsRoutes = require('./routes/settings');
