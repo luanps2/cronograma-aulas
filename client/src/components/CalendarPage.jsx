@@ -14,45 +14,39 @@ import API_BASE_URL from '../config/api';
 export default function CalendarPage({ user, onLogout }) {
     const navigate = useNavigate();
     const [currentDate, setCurrentDate] = useState(new Date(2026, 0, 1));
-    const [lessons, setLessons] = useState([]);
-    const [courses, setCourses] = useState([]);
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-    const [isNewLessonModalOpen, setIsNewLessonModalOpen] = useState(false);
-    const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-    const [quickAddType, setQuickAddType] = useState('courses');
-    const [selectedDateForModal, setSelectedDateForModal] = useState(new Date());
-    const [calendarViewMode, setCalendarViewMode] = useState('grid');
-    const [selectedLesson, setSelectedLesson] = useState(null);
-    const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: null });
-
-    // Drag and Drop state
-    const [draggedLesson, setDraggedLesson] = useState(null);
-    const [dragOverDate, setDragOverDate] = useState(null);
-
-    // Mobile move mode
-    const [movingLesson, setMovingLesson] = useState(null);
-
-    // Filter states
-    const [allClasses, setAllClasses] = useState([]);
-    const [allUCs, setAllUCs] = useState([]);
-    const [filters, setFilters] = useState({ turma: '', ucId: '' });
+    const [events, setEvents] = useState([]);
+    const [holidays, setHolidays] = useState([]);
+    const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+    const [selectedEvent, setSelectedEvent] = useState(null);
 
     useEffect(() => {
         fetchLessons();
         fetchCourses();
+        fetchEvents();
         fetchFilterOptions();
     }, [currentDate]);
 
-    const fetchFilterOptions = async () => {
+    // Generate holidays when currentDate changes (year context)
+    useEffect(() => {
+        import('../utils/holidays').then(({ getHolidays }) => {
+            setHolidays(getHolidays(currentDate.getFullYear()));
+        });
+    }, [currentDate.getFullYear()]);
+
+    const fetchEvents = async () => {
         try {
-            const [classesRes, ucsRes] = await Promise.all([
-                axios.get(`${API_BASE_URL}/api/settings/classes`),
-                axios.get(`${API_BASE_URL}/api/settings/ucs`)
-            ]);
-            setAllClasses(classesRes.data);
-            setAllUCs(ucsRes.data);
+            const response = await axios.get(`${API_BASE_URL}/api/events`);
+            const formattedEvents = response.data.map(event => {
+                // TIMEZONE FIX: Always parse YYYY-MM-DD as local date
+                const dateStr = typeof event.date === 'string' ? event.date.split('T')[0] : event.date;
+                const parts = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (!parts) return null;
+                const dateObj = new Date(parseInt(parts[1]), parseInt(parts[2]) - 1, parseInt(parts[3]));
+                return { ...event, date: dateObj };
+            }).filter(Boolean);
+            setEvents(formattedEvents);
         } catch (error) {
-            console.error('Error fetching filter options:', error);
+            console.error('Error fetching events:', error);
         }
     };
 
@@ -64,8 +58,26 @@ export default function CalendarPage({ user, onLogout }) {
             return;
         }
         setSelectedDateForModal(date);
-        setSelectedLesson(null);
-        setIsNewLessonModalOpen(true);
+
+        // Custom Logic: If date has events, maybe show list? 
+        // For now, we open a small menu or just default to New Modal.
+        // The user asked for an option: "Create Lesson" OR "Create Event"
+        // We will implement a simple choice modal or rely on the UI to provide buttons.
+        // Let's modify this to open a choice or just defaulting to LessonModal but adding an "Add Event" button there?
+        // User request: "Ao clicar em uma data: Criar Aula / Criar Evento"
+        // Let's inject a specialized small modal or use the context menu approach.
+        // For simplicity and mobile-friendliness, let's open a "Day Action Modal" or simply add a toggle in the UI.
+        // Actually, let's use a state `isDateMenuOpen` to show options.
+        setDateMenu({ isOpen: true, date });
+    };
+
+    const [dateMenu, setDateMenu] = useState({ isOpen: false, date: null });
+
+    const handleEventSelect = (event, e) => {
+        e.stopPropagation();
+        setSelectedEvent(event);
+        setSelectedDateForModal(event.date);
+        setIsEventModalOpen(true);
     };
 
     const handleLessonSelect = (lesson, e) => {
@@ -312,7 +324,8 @@ export default function CalendarPage({ user, onLogout }) {
                     </div>
 
                     {
-                        calendarViewMode === 'grid' ? (
+                        {
+                            calendarViewMode === 'grid' ? (
                             <div className="calendar-grid">
                                 {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
                                     <div key={day} className="calendar-day-header">{day}</div>
@@ -320,14 +333,23 @@ export default function CalendarPage({ user, onLogout }) {
 
                                 {calendarDays.map((dayItem, idx) => {
                                     const isCurrentMonth = isSameMonth(dayItem, monthStart);
-                                    let dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
 
+                                    // Filter Lessons
+                                    let dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
                                     if (filters.turma) {
                                         dayLessons = dayLessons.filter(l => l.turma === filters.turma);
                                     }
                                     if (filters.ucId) {
                                         dayLessons = dayLessons.filter(l => String(l.ucId) === String(filters.ucId));
                                     }
+
+                                    // Filter Events
+                                    const dayEvents = events.filter(e => isSameDay(e.date, dayItem));
+
+                                    // Filter Holidays
+                                    // Holiday dates are strings "YYYY-MM-DD", need to compare carefully
+                                    const formattedDay = format(dayItem, 'yyyy-MM-dd');
+                                    const dayHolidays = holidays.filter(h => h.date === formattedDay);
 
                                     const isTodayDate = isToday(dayItem);
                                     const isDragTarget = dragOverDate && isSameDay(dragOverDate, dayItem);
@@ -343,11 +365,45 @@ export default function CalendarPage({ user, onLogout }) {
                                             onDrop={(e) => handleDrop(e, dayItem)}
                                             style={{ cursor: isMovingTarget ? 'crosshair' : 'pointer' }}
                                         >
-                                            <span className="day-number">{format(dayItem, 'd')}</span>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span className="day-number">{format(dayItem, 'd')}</span>
+                                                {dayHolidays.length > 0 && (
+                                                    <span style={{ fontSize: '0.7rem', color: 'red', fontWeight: 'bold', marginRight: '4px' }} title={dayHolidays[0].name}>Feriado</span>
+                                                )}
+                                            </div>
+
                                             <div className="day-events">
+                                                {/* Holidays */}
+                                                {dayHolidays.map((holiday, hIdx) => (
+                                                    <div key={`hol-${hIdx}`} style={{
+                                                        background: '#FFEBEE', color: '#C62828',
+                                                        padding: '4px', borderRadius: '4px', fontSize: '0.75rem',
+                                                        border: '1px solid #FFCDD2', fontWeight: 500
+                                                    }}>
+                                                        🎉 {holiday.name}
+                                                    </div>
+                                                ))}
+
+                                                {/* Custom Events */}
+                                                {dayEvents.map((event, eIdx) => (
+                                                    <div key={`evt-${eIdx}`}
+                                                        onClick={(e) => handleEventSelect(event, e)}
+                                                        style={{
+                                                            background: event.color || '#E3F2FD',
+                                                            color: '#1565C0',
+                                                            padding: '4px', borderRadius: '4px', fontSize: '0.75rem',
+                                                            borderLeft: `3px solid ${event.color ? '#1976D2' : '#2196F3'}`,
+                                                            cursor: 'pointer',
+                                                            overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'
+                                                        }}>
+                                                        <span style={{ fontWeight: 'bold' }}>{event.title}</span>
+                                                    </div>
+                                                ))}
+
+                                                {/* Lessons */}
                                                 {dayLessons.map((lesson, lIdx) => (
                                                     <LessonCard
-                                                        key={lIdx}
+                                                        key={`less-${lIdx}`}
                                                         lesson={lesson}
                                                         onClick={(e) => handleLessonSelect(lesson, e)}
                                                         onDragStart={(e) => handleDragStart(e, lesson)}
@@ -364,16 +420,17 @@ export default function CalendarPage({ user, onLogout }) {
                         ) : (
                             <div style={{ border: '1px solid var(--border-color)', borderTop: 'none', background: 'var(--bg-primary)', borderRadius: '0 0 12px 12px' }}>
                                 {calendarDays.filter(d => isSameMonth(d, monthStart)).map((dayItem, idx) => {
+                                    // Helper filters
                                     let dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
+                                    if (filters.turma) dayLessons = dayLessons.filter(l => l.turma === filters.turma);
+                                    if (filters.ucId) dayLessons = dayLessons.filter(l => String(l.ucId) === String(filters.ucId));
 
-                                    if (filters.turma) {
-                                        dayLessons = dayLessons.filter(l => l.turma === filters.turma);
-                                    }
-                                    if (filters.ucId) {
-                                        dayLessons = dayLessons.filter(l => String(l.ucId) === String(filters.ucId));
-                                    }
+                                    const dayEvents = events.filter(e => isSameDay(e.date, dayItem));
+                                    const formattedDay = format(dayItem, 'yyyy-MM-dd');
+                                    const dayHolidays = holidays.filter(h => h.date === formattedDay);
 
-                                    if (dayLessons.length === 0) return null;
+                                    if (dayLessons.length === 0 && dayEvents.length === 0 && dayHolidays.length === 0) return null;
+
                                     return (
                                         <div key={idx} className="list-view-day">
                                             <div style={{ minWidth: '60px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -381,6 +438,22 @@ export default function CalendarPage({ user, onLogout }) {
                                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{format(dayItem, 'EEE', { locale: ptBR })}</div>
                                             </div>
                                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                {/* Holidays List */}
+                                                {dayHolidays.map((h, i) => (
+                                                    <div key={i} style={{ padding: '10px', background: '#FFEBEE', color: '#C62828', borderRadius: '8px', border: '1px solid #FFCDD2' }}>
+                                                        🎉 <strong>Feriado:</strong> {h.name}
+                                                    </div>
+                                                ))}
+                                                {/* Events List */}
+                                                {dayEvents.map((e, i) => (
+                                                    <div key={i} onClick={(evt) => handleEventSelect(e, evt)} style={{
+                                                        padding: '10px', background: e.color || '#E3F2FD', borderRadius: '8px', cursor: 'pointer',
+                                                        borderLeft: `4px solid ${e.color ? '#1565C0' : '#2196F3'}`
+                                                    }}>
+                                                        <strong>{e.title}</strong> - {e.description}
+                                                    </div>
+                                                ))}
+                                                {/* Lessons List */}
                                                 {dayLessons.map((lesson, lIdx) => (
                                                     <LessonCard key={lIdx} lesson={lesson} horizontal onClick={(e) => handleLessonSelect(lesson, e)} />
                                                 ))}
@@ -388,11 +461,12 @@ export default function CalendarPage({ user, onLogout }) {
                                         </div>
                                     )
                                 })}
-                                {lessons.filter(l => isSameMonth(l.date, monthStart)).length === 0 && (
-                                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>Nenhuma aula agendada para este mês.</div>
+                                {lessons.filter(l => isSameMonth(l.date, monthStart)).length === 0 && events.filter(e => isSameMonth(e.date, monthStart)).length === 0 && holidays.filter(h => h.date.startsWith(format(monthStart, 'yyyy-MM'))).length === 0 && (
+                                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>Nenhuma atividade agendada para este mês.</div>
                                 )}
                             </div>
                         )
+                    }
                     }
                 </div>
 
@@ -405,39 +479,98 @@ export default function CalendarPage({ user, onLogout }) {
                 </div>
             </div>
 
-            <ImportModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                onImportSuccess={fetchLessons}
-            />
-            <NewLessonModal
-                isOpen={isNewLessonModalOpen}
-                initialDate={selectedDateForModal}
-                lesson={selectedLesson}
-                onClose={() => setIsNewLessonModalOpen(false)}
-                onSave={() => {
-                    setIsNewLessonModalOpen(false);
-                    fetchLessons();
-                }}
-            />
-            <QuickAddModal
-                isOpen={isQuickAddOpen}
-                onClose={() => setIsQuickAddOpen(false)}
-                type={quickAddType}
-                data={{ courses }}
-                onSave={handleSaveQuickAdd}
-            />
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                type={confirmModal.type}
-                confirmText={confirmModal.confirmText || 'Confirmar'}
-                onConfirm={confirmModal.onConfirm}
-            />
+            import EventModal from './EventModal';
 
-            <style>{`
+            // ... (existing imports)
+
+            // (Inside CalendarPage function)
+            // ...
+
+            return (
+            <>
+                {/* Date Action Menu (Simple Overlay) */}
+                {dateMenu.isOpen && (
+                    <div className="modal-overlay" onClick={() => setDateMenu({ isOpen: false, date: null })} style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.4)', zIndex: 1200,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{
+                            background: 'var(--bg-primary)', padding: '24px', borderRadius: '12px',
+                            minWidth: '300px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                            textAlign: 'center'
+                        }}>
+                            <h3 style={{ marginTop: 0, marginBottom: '20px' }}>
+                                {dateMenu.date && format(dateMenu.date, "d 'de' MMMM", { locale: ptBR })}
+                            </h3>
+                            <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                                <button className="btn-primary" onClick={() => {
+                                    setDateMenu({ isOpen: false, date: null });
+                                    setSelectedDateForModal(dateMenu.date);
+                                    setSelectedLesson(null);
+                                    setIsNewLessonModalOpen(true);
+                                }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px' }}>
+                                    <BookOpen size={20} /> Nova Aula
+                                </button>
+                                <button className="btn-outline" onClick={() => {
+                                    setDateMenu({ isOpen: false, date: null });
+                                    setSelectedDateForModal(dateMenu.date);
+                                    setSelectedEvent(null);
+                                    setIsEventModalOpen(true);
+                                }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', background: '#E3F2FD', color: '#1565C0', border: 'none' }}>
+                                    <CalendarDays size={20} /> Novo Evento
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="calendar-page-container">
+                    {/* ... (existing content) ... */}
+                </div>
+
+                <ImportModal
+                    isOpen={isImportModalOpen}
+                    onClose={() => setIsImportModalOpen(false)}
+                    onImportSuccess={fetchLessons}
+                />
+                <NewLessonModal
+                    isOpen={isNewLessonModalOpen}
+                    initialDate={selectedDateForModal}
+                    lesson={selectedLesson}
+                    onClose={() => setIsNewLessonModalOpen(false)}
+                    onSave={() => {
+                        setIsNewLessonModalOpen(false);
+                        fetchLessons();
+                    }}
+                />
+                <EventModal
+                    isOpen={isEventModalOpen}
+                    date={selectedDateForModal}
+                    eventToEdit={selectedEvent}
+                    onClose={() => setIsEventModalOpen(false)}
+                    onSaveSuccess={() => {
+                        fetchEvents(); // Refresh events
+                    }}
+                />
+                <QuickAddModal
+                    isOpen={isQuickAddOpen}
+                    onClose={() => setIsQuickAddOpen(false)}
+                    type={quickAddType}
+                    data={{ courses }}
+                    onSave={handleSaveQuickAdd}
+                />
+                <ConfirmModal
+                    isOpen={confirmModal.isOpen}
+                    onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                    title={confirmModal.title}
+                    message={confirmModal.message}
+                    type={confirmModal.type}
+                    confirmText={confirmModal.confirmText || 'Confirmar'}
+                    onConfirm={confirmModal.onConfirm}
+                />
+
+                <style>{`
                 .calendar-page-container {
                     display: flex;
                     flex-direction: column;
@@ -615,8 +748,11 @@ export default function CalendarPage({ user, onLogout }) {
                     .calendar-section { order: 3; }
                 }
             `}</style>
+            </>
+            )
+            {/* ... */}
         </>
-    )
+    );
 }
 
 function LessonCard({ lesson, horizontal, onClick, onDragStart, onDragEnd, onLongPress, isBeingDragged }) {
@@ -739,6 +875,62 @@ function LessonCard({ lesson, horizontal, onClick, onDragStart, onDragEnd, onLon
             )}
         </div>
     )
+}
+
+function ShortcutCard({ icon, label, color, onClick }) {
+    return (
+        <div
+            onClick={onClick}
+            className="shortcut-card"
+            style={{
+                background: 'var(--bg-primary)',
+                padding: '24px',
+                borderRadius: '16px',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '15px',
+                cursor: 'pointer',
+                boxShadow: 'var(--card-shadow)',
+                transition: 'transform 0.2s',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+            <div style={{ padding: '12px', borderRadius: '12px', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</div>
+            <span style={{ fontWeight: 600, fontSize: '1.2rem', color: 'var(--text-primary)' }}>{label}</span>
+
+            <style>{`
+                @media (max-width: 640px) {
+                    .shortcut-card {
+                        padding: 12px !important;
+                        gap: 8px !important;
+                        min-height: 60px;
+                    }
+
+                    .shortcut-card > div:first-child {
+                        padding: 8px !important;
+                    }
+
+                    .shortcut-card span {
+                        font-size: 0.9rem !important;
+                    }
+                }
+            `}</style>
+        </div>
+    )
+} whiteSpace: 'nowrap',
+    overflow: 'hidden',
+        textOverflow: 'ellipsis',
+            borderTop: '1px solid var(--border-color)',
+                marginTop: '2px',
+                    paddingTop: '2px'
+                    }}>
+    { lesson.description }
+                    </div >
+                )}
+            </div >
+            )
 }
 
 function ShortcutCard({ icon, label, color, onClick }) {

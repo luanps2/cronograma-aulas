@@ -72,6 +72,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/links', authMiddleware, linksRoutes);
+app.use('/api/events', authMiddleware, require('./routes/events')); // NEW: Events Route
 app.use('/api/dashboard', authMiddleware, require('./routes/dashboard'));
 
 // Rotas
