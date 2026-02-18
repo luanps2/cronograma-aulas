@@ -81,292 +81,278 @@ export default function Header({ user, onLogout, onNavigateHome }) {
     const hasLinks = Object.keys(groupedLinks).length > 0;
 
     return (
-        <header style={{
-            backgroundColor: 'var(--bg-primary)',
-            borderBottom: '1px solid var(--border-color)',
-            padding: '0 20px',
-            height: '80px',
-            display: 'flex',
-            flexDirection: 'row', // FORCE ROW
-            flexWrap: 'nowrap',   // FORCE NO WRAP
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            position: 'sticky',
-            top: 0,
-            zIndex: 1000,
-            boxShadow: 'var(--card-shadow)',
-            width: '100%',
-            boxSizing: 'border-box'
-        }} className="main-header">
-            {/* Left: Logo & Branding */}
-            <div
-                onClick={onNavigateHome}
-                style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '15px', cursor: 'pointer', marginRight: '20px', flexShrink: 0 }}
-                title="Ir para o Início"
-            >
-                <img src="/senac-logo.png" alt="Senac" style={{ height: '48px' }} />
-                <div style={{ height: '32px', width: '1px', background: 'var(--border-color)', display: 'none', md: 'block' }}></div>
-                <h1 style={{
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary)',
-                    margin: 0,
-                    display: 'flex', // Enforce flex
-                    alignItems: 'center',
-                    gap: '8px'
-                }} className="hide-mobile">
-                    Planejamento Acadêmico
-                </h1>
-            </div>
+        <>
+            <header style={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between', // Ensures Left, Center, Right distribution
+                width: '100%',
+                height: '64px',
+                position: 'sticky',
+                top: 0,
+                zIndex: 50,
+                backgroundColor: 'var(--bg-primary)',
+                borderBottom: '1px solid var(--border-color)',
+                padding: '0 20px',
+                boxShadow: 'var(--card-shadow)',
+                boxSizing: 'border-box'
+            }} className="main-header">
 
-            {/* Center: Dynamic Links + Dashboard */}
-            <div className="header-links-area hide-mobile" style={{ flex: 1, display: 'flex', flexDirection: 'row', gap: '24px', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap' }}>
-                {/* Dashboard Button - NOW VISIBLE */}
-                <button
-                    onClick={() => navigate('/dashboard')}
+                {/* 1. Left: Logo */}
+                <div
+                    onClick={onNavigateHome}
                     style={{
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        padding: '8px 16px', borderRadius: '6px',
-                        fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)',
-                        backgroundColor: 'transparent',
-                        transition: '0.2s',
-                        border: 'none',
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: '15px',
                         cursor: 'pointer',
-                        whiteSpace: 'nowrap'
+                        flexShrink: 0 // Prevent logo shrinking
                     }}
-                    className="nav-link-btn"
-                    title="Ir para Dashboard"
+                    title="Ir para o Início"
                 >
-                    <LayoutGrid size={16} /> Dashboard
-                </button>
-
-                {CATEGORY_ORDER.map(cat => {
-                    const links = groupedLinks[cat];
-                    if (!links || links.length === 0) return null;
-
-                    const isOpen = openCategory === cat;
-
-                    return (
-                        <div key={cat} style={{ position: 'relative' }}>
-                            <button
-                                onClick={() => setOpenCategory(isOpen ? null : cat)}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '6px',
-                                    padding: '8px 12px', borderRadius: '6px',
-                                    fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)',
-                                    backgroundColor: isOpen ? 'var(--bg-tertiary)' : 'transparent',
-                                    transition: '0.2s',
-                                    whiteSpace: 'nowrap'
-                                }}
-                                className="nav-link-btn"
-                            >
-                                {cat} <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
-                            </button>
-
-
-                            {isOpen && (
-                                <>
-                                    <div
-                                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 990 }}
-                                        onClick={() => setOpenCategory(null)}
-                                    />
-                                    <div style={{
-                                        position: 'absolute', top: '120%', left: 0,
-                                        background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
-                                        borderRadius: '8px', boxShadow: 'var(--card-shadow)',
-                                        minWidth: '200px', zIndex: 1005, padding: '5px',
-                                        display: 'flex', flexDirection: 'column', gap: '2px'
-                                    }}>
-                                        {links.map(link => (
-                                            <a
-                                                key={link.id} href={link.url} target="_blank" rel="noopener noreferrer"
-                                                className="dropdown-item"
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                                    padding: '10px', textDecoration: 'none', color: 'var(--text-primary)',
-                                                    borderRadius: '6px', fontSize: '0.9rem'
-                                                }}
-                                                onClick={() => setOpenCategory(null)}
-                                            >
-                                                <ExternalLink size={14} color="var(--text-secondary)" />
-                                                {link.title}
-                                            </a>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Right: Actions & User */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-
-                {/* Theme Toggle */}
-                <button
-                    onClick={toggleTheme}
-                    className="btn-icon"
-                    title={isDarkMode ? "Modo Claro" : "Modo Escuro"}
-                >
-                    {isDarkMode ? <Sun size={20} color="#FFB74D" /> : <Moon size={20} color="var(--text-secondary)" />}
-                </button>
-
-                {/* Notification Bell */}
-                <div style={{ position: 'relative' }}>
-                    <button
-                        onClick={() => setIsNotifOpen(!isNotifOpen)}
-                        className="btn-icon"
-                        style={{ position: 'relative' }}
-                    >
-                        <Bell size={20} color={isDarkMode ? '#AAA' : '#666'} />
-                        {notifications.length > 0 && (
-                            <span style={{
-                                position: 'absolute', top: -2, right: -2,
-                                background: '#EF5350', color: 'white', borderRadius: '50%',
-                                width: '18px', height: '18px', fontSize: '11px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold',
-                                border: '2px solid white'
-                            }}>{notifications.length}</span>
-                        )}
-                    </button>
-
-                    {/* Notification Panel */}
-                    {isNotifOpen && (
-                        <>
-                            {/* Overlay to close */}
-                            <div
-                                className="notif-overlay"
-                                onClick={() => setIsNotifOpen(false)}
-                                style={{
-                                    position: 'fixed',
-                                    top: 0, left: 0, right: 0, bottom: 0,
-                                    background: 'rgba(0,0,0,0.3)',
-                                    zIndex: 1050
-                                }}
-                            />
-                            <div className="notif-dropdown" style={{
-                                backgroundColor: 'var(--bg-primary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '12px',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                zIndex: 1060,
-                                maxHeight: '500px',
-                                overflow: 'auto'
-                            }}>
-                                <div style={{ padding: '15px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Aulas de Hoje</h4>
-                                    <button onClick={() => setIsNotifOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-tertiary)' }}>
-                                        <X size={18} />
-                                    </button>
-                                </div>
-                                {notifications.length > 0 ? (
-                                    <div>
-                                        {notifications.map((lesson, idx) => (
-                                            <div key={idx} style={{
-                                                padding: '15px',
-                                                borderBottom: idx < notifications.length - 1 ? '1px solid var(--border-color)' : 'none',
-                                                cursor: 'pointer',
-                                                transition: 'background 0.2s'
-                                            }}
-                                                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
-                                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                                                <div style={{ fontWeight: 600, marginBottom: '5px' }}>{lesson.period}</div>
-                                                <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>Lab:</strong> {lesson.lab}</div>
-                                                <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>Turma:</strong> {lesson.turma}</div>
-                                                <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>UC:</strong> {lesson.uc || lesson.ucName}</div>
-                                                {lesson.description && <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: '5px' }}>{lesson.description}</div>}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-                                        Nenhuma aula agendada para hoje
-                                    </div>
-                                )}
-                            </div>
-                        </>
-                    )}
+                    <img src="/senac-logo.png" alt="Senac" style={{ height: '32px', display: 'block' }} />
+                    <h1 style={{
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        color: 'var(--text-secondary)',
+                        margin: 0,
+                        whiteSpace: 'nowrap'
+                    }} className="hide-mobile">
+                        Planejamento Acadêmico
+                    </h1>
                 </div>
 
-                {/* User Dropdown */}
-                <div style={{ position: 'relative' }}>
+                {/* 2. Center: Navigation (Dashboard + Links) */}
+                {/* Using flex: 1 to occupy space and justify-content: center to center the menu */}
+                <div className="hide-mobile" style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '24px',
+                    height: '100%' // Ensure full height alignment
+                }}>
                     <button
-                        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                        onClick={() => navigate('/dashboard')}
+                        className="nav-link-btn"
                         style={{
-                            display: 'flex', alignItems: 'center', gap: '12px',
-                            background: 'none', border: 'none', cursor: 'pointer', outline: 'none'
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontSize: '0.9rem',
+                            fontWeight: 500,
+                            color: 'var(--text-primary)',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
                         }}
                     >
-                        {user?.avatar_url ? (
-                            <img
-                                src={user.avatar_url}
-                                alt={user.name}
-                                style={{
-                                    width: '48px', height: '48px',
-                                    minWidth: '48px', minHeight: '48px',
-                                    borderRadius: '50%', objectFit: 'cover',
-                                    aspectRatio: '1/1',
-                                    border: '2px solid #fff', boxShadow: '0 0 0 2px #E3F2FD'
-                                }}
-                            />
-                        ) : (
-                            <div style={{
-                                width: '48px', height: '48px',
-                                minWidth: '48px', minHeight: '48px',
-                                borderRadius: '50%', background: '#E3F2FD', color: '#0277BD',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                aspectRatio: '1/1',
-                                fontWeight: 'bold', border: '2px solid #fff', boxShadow: '0 0 0 2px #E3F2FD',
-                                fontSize: '1.2rem'
-                            }}>
-                                {user?.name ? user.name.charAt(0).toUpperCase() : <User size={24} />}
-                            </div>
-                        )}
-                        <div className="hide-mobile" style={{ textAlign: 'left' }}>
-                            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>{user?.name || 'Usuário'}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>Professor</div>
-                        </div>
+                        <LayoutGrid size={18} />
+                        Dashboard
                     </button>
 
-                    {isUserMenuOpen && (
-                        <div style={{
-                            position: 'absolute', top: '120%', right: 0,
-                            background: 'var(--bg-primary)', borderRadius: '8px',
-                            boxShadow: 'var(--card-shadow)', border: '1px solid var(--border-color)',
-                            width: '220px', overflow: 'hidden', zIndex: 1001
-                        }}>
-                            <div style={{ padding: '15px', borderBottom: '1px solid var(--border-color)' }}>
-                                <div style={{ fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.name}</div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</div>
+                    {CATEGORY_ORDER.map(cat => {
+                        const links = groupedLinks[cat];
+                        if (!links || links.length === 0) return null;
+                        const isOpen = openCategory === cat;
+
+                        return (
+                            <div key={cat} style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
+                                <button
+                                    onClick={() => setOpenCategory(isOpen ? null : cat)}
+                                    className="nav-link-btn"
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.9rem',
+                                        fontWeight: 500,
+                                        color: 'var(--text-primary)',
+                                        background: isOpen ? 'var(--bg-tertiary)' : 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    {cat} <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+                                </button>
+
+                                {isOpen && (
+                                    <>
+                                        <div
+                                            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 990, cursor: 'default' }}
+                                            onClick={() => setOpenCategory(null)}
+                                        />
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: 'calc(100% + 5px)',
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
+                                            background: 'var(--bg-primary)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '8px',
+                                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                            minWidth: '220px',
+                                            zIndex: 1005,
+                                            padding: '5px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '2px'
+                                        }}>
+                                            {links.map(link => (
+                                                <a
+                                                    key={link.id}
+                                                    href={link.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="dropdown-item"
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                                        padding: '10px 12px',
+                                                        textDecoration: 'none',
+                                                        color: 'var(--text-primary)',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.9rem',
+                                                        transition: 'background 0.2s'
+                                                    }}
+                                                    onClick={() => setOpenCategory(null)}
+                                                >
+                                                    <ExternalLink size={14} color="var(--text-secondary)" />
+                                                    {link.title}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
                             </div>
-
-                            <button onClick={() => { setIsUserMenuOpen(false); navigate('/dashboard'); }} className="dropdown-item" style={dropdownItemStyle}>
-                                <LayoutGrid size={16} /> Dashboard
-                            </button>
-                            <button onClick={() => { setIsUserMenuOpen(false); navigate('/settings'); }} className="dropdown-item" style={dropdownItemStyle}>
-                                <Settings size={16} /> Configurações
-                            </button>
-                            <button onClick={() => { setIsUserMenuOpen(false); setIsImportModalOpen(true); }} className="dropdown-item" style={dropdownItemStyle}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2E7D32' }}>
-                                    <span style={{ fontSize: '1.1rem' }}>📥</span> Importar Planilha
-                                </div>
-                            </button>
-
-                            <div style={{ height: '1px', background: 'var(--border-color)', margin: '5px 0' }}></div>
-
-                            <button
-                                onClick={onLogout}
-                                style={{ ...dropdownItemStyle, color: '#D32F2F' }}
-                                className="dropdown-item"
-                            >
-                                <LogOut size={16} /> Sair
-                            </button>
-                        </div>
-                    )}
+                        );
+                    })}
                 </div>
-            </div>
 
+                {/* 3. Right: User & Actions */}
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: '16px',
+                    flexShrink: 0 // Prevent shrinking
+                }}>
+                    <button onClick={toggleTheme} className="btn-icon">
+                        {isDarkMode ? <Sun size={20} color="#FFB74D" /> : <Moon size={20} color="var(--text-secondary)" />}
+                    </button>
+
+                    <div style={{ position: 'relative' }}>
+                        <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="btn-icon" style={{ position: 'relative' }}>
+                            <Bell size={20} color={isDarkMode ? '#AAA' : '#666'} />
+                            {notifications.length > 0 && (
+                                <span style={{
+                                    position: 'absolute', top: 0, right: 0,
+                                    background: '#EF5350', color: 'white', borderRadius: '50%',
+                                    width: '16px', height: '16px', fontSize: '10px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold'
+                                }}>{notifications.length}</span>
+                            )}
+                        </button>
+                        {isNotifOpen && (
+                            <>
+                                <div className="notif-overlay" onClick={() => setIsNotifOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1050 }} />
+                                <div className="notif-dropdown" style={{
+                                    position: 'absolute', top: '120%', right: 0,
+                                    backgroundColor: 'var(--bg-primary)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                                    zIndex: 1060,
+                                    width: '320px',
+                                    maxHeight: '400px',
+                                    overflow: 'auto'
+                                }}>
+                                    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Aulas de Hoje</h4>
+                                        <X size={16} style={{ cursor: 'pointer' }} onClick={() => setIsNotifOpen(false)} />
+                                    </div>
+                                    {notifications.length > 0 ? (
+                                        notifications.map((lesson, idx) => (
+                                            <div key={idx} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)' }}>
+                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{lesson.period} - {lesson.uc || lesson.ucName}</div>
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>{lesson.turma} • {lesson.lab}</div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>Sem aulas hoje</div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '10px',
+                                background: 'transparent', border: 'none', cursor: 'pointer', padding: 0
+                            }}
+                        >
+                            {user?.avatar_url ? (
+                                <img src={user.avatar_url} alt="User" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--bg-secondary)' }} />
+                            ) : (
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                    {user?.name?.[0] || 'U'}
+                                </div>
+                            )}
+                            <div className="hide-mobile" style={{ textAlign: 'left' }}>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{user?.name?.split(' ')[0]}</div>
+                            </div>
+                        </button>
+
+                        {isUserMenuOpen && (
+                            <>
+                                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1000 }} onClick={() => setIsUserMenuOpen(false)} />
+                                <div style={{
+                                    position: 'absolute', top: '120%', right: 0,
+                                    background: 'var(--bg-primary)',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                    border: '1px solid var(--border-color)',
+                                    width: '200px',
+                                    zIndex: 1001,
+                                    overflow: 'hidden',
+                                    padding: '5px'
+                                }}>
+                                    <button onClick={() => navigate('/settings')} className="dropdown-item" style={dropdownItemStyle}><Settings size={16} /> Configurações</button>
+                                    <button onClick={() => setIsImportModalOpen(true)} className="dropdown-item" style={dropdownItemStyle}><span style={{ fontSize: '1rem' }}>📥</span> Importar</button>
+                                    <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
+                                    <button onClick={onLogout} className="dropdown-item" style={{ ...dropdownItemStyle, color: '#D32F2F' }}><LogOut size={16} /> Sair</button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                <style>{`
+                    .main-header { box-sizing: border-box; }
+                    .nav-link-btn:hover { background-color: var(--bg-secondary) !important; }
+                    .dropdown-item:hover { background-color: var(--bg-secondary) !important; }
+                    
+                    @media (max-width: 900px) {
+                        .hide-mobile { display: none !important; }
+                    }
+                    @media (max-width: 640px) {
+                        .main-header { padding: 0 15px !important; }
+                    }
+                `}</style>
+            </header>
+
+            {/* Modals outside header structure to prevent flex interference */}
             <LinkManagerModal
                 isOpen={isLinkManagerOpen}
                 onClose={() => {
@@ -379,75 +365,10 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 onImportSuccess={() => {
-                    // Dispatch global event for CalendarPage to refresh
                     window.dispatchEvent(new Event('lessons-updated'));
-                    // Also refresh header links if needed, though unlikely affected immediately
                 }}
             />
-
-            <style>{`
-                .main-header {
-                    width: 100% !important;
-                }
-
-                /* Notification dropdown - desktop: absolute, mobile: centered modal */
-                .notif-dropdown {
-                    position: absolute;
-                    top: 50px;
-                    right: 0;
-                    width: 350px;
-                    max-width: 90vw;
-                }
-
-                @media (max-width: 640px) {
-                    .notif-dropdown {
-                        position: fixed !important;
-                        top: 50% !important;
-                        left: 50% !important;
-                        right: auto !important;
-                        transform: translate(-50%, -50%) !important;
-                        width: 90vw !important;
-                        max-height: 80vh !important;
-                    }
-                }
-
-                @media (max-width: 900px) {
-                    .hide-mobile { display: none !important; }
-
-                    .main-header {
-                        height: 60px !important;
-                        padding: 0 10px !important;
-                    }
-
-                    .main-header img {
-                        height: 36px !important;
-                    }
-                }
-
-                .btn-icon { 
-                    background: none; 
-                    border: none; 
-                    cursor: pointer; 
-                    padding: 10px; 
-                    border-radius: 50%; 
-                    transition: background 0.2s; 
-                    outline: none !important;
-                    box-shadow: none !important;
-                }
-                .btn-icon:hover { 
-                    background: var(--bg-secondary); 
-                }
-                .btn-icon:focus { 
-                    outline: none !important; 
-                    box-shadow: none !important;
-                }
-                .btn-icon:active {
-                    outline: none !important;
-                    box-shadow: none !important;
-                }
-                .nav-link-btn:hover { background-color: var(--bg-secondary) !important; color: var(--text-primary) !important; }
-                .dropdown-item:hover { background-color: var(--bg-secondary); }
-            `}</style>
-        </header>
+        </>
     );
+
 }
