@@ -94,14 +94,42 @@ router.post('/upload-excel', authMiddleware, upload.single('image'), async (req,
                 courseId = courseRes.rows[0].id;
             }
 
-            // 2. Resolver TURMA
-            let classRes = await client.query('SELECT id FROM classes WHERE name = $1', [normalized.turma]);
+            // 2. Resolver TURMA (NORMALIZAÇÃO ROBUSTA)
+            // Função de normalização exigida
+            const normalizeClassName = (name) => {
+                return name
+                    .toUpperCase()
+                    .trim()
+                    .replace(/\s*-\s*/g, '-') // "TI - 27" -> "TI-27"
+                    .replace(/\s+/g, '');     // Remove espaços extras
+            };
 
-            if (classRes.rows.length === 0) {
-                await client.query(
-                    'INSERT INTO classes (name, courseid) VALUES ($1, $2)',
-                    [normalized.turma, courseId]
+            const inputClassNameNormalized = normalizeClassName(normalized.turma);
+
+            // CRITICAL FIX: Ensure clean name is used everywhere (lessons table stores string)
+            normalized.turma = inputClassNameNormalized;
+
+            // Buscar todas as turmas deste curso para comparação segura
+            const existingClassesRes = await client.query('SELECT id, name FROM classes WHERE courseid = $1', [courseId]);
+            let classId = null;
+
+            // Verificar se já existe alguma turma que, normalizada, seja igual à entrada
+            const foundClass = existingClassesRes.rows.find(cls => normalizeClassName(cls.name) === inputClassNameNormalized);
+
+            if (foundClass) {
+                // Reutiliza existente
+                classId = foundClass.id;
+                // Opcional: Se quiser atualizar o nome no banco para o padrão normalizado, faria aqui. 
+                // Por segurança e simplicidade (Regra 4 - Não quebrar existentes), apenas reutilizamos.
+            } else {
+                // Cria nova já normalizada com formatação visual agradável (Espaço antes/depois do hífen se preferir, ou estrito)
+                // O usuario pediu: "TI-27" (sem espaços) como padrão.
+                // A função normalizeClassName remove espaços. Vamos usar o resultado dela.
+                const newClass = await client.query(
+                    'INSERT INTO classes (name, courseid) VALUES ($1, $2) RETURNING id',
+                    [inputClassNameNormalized, courseId]
                 );
+                classId = newClass.rows[0].id;
             }
 
             // 3. Resolver UNIDADE CURRICULAR (UC)
