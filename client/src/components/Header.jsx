@@ -84,166 +84,177 @@ export default function Header({ user, onLogout, onNavigateHome }) {
         <>
             <header style={{
                 display: 'flex',
-                flexDirection: 'row',
                 alignItems: 'center',
-                justifyContent: 'space-between', // Ensures Left, Center, Right distribution
+                justifyContent: 'space-between',
                 width: '100%',
                 height: '64px',
+                padding: '0 20px',
+                backgroundColor: 'var(--bg-primary)',
+                borderBottom: '1px solid var(--border-color)',
                 position: 'sticky',
                 top: 0,
                 zIndex: 50,
-                backgroundColor: 'var(--bg-primary)',
-                borderBottom: '1px solid var(--border-color)',
-                padding: '0 20px',
                 boxShadow: 'var(--card-shadow)',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                flexWrap: 'nowrap'
             }} className="main-header">
 
-                {/* 1. Left: Logo */}
-                <div
-                    onClick={onNavigateHome}
-                    style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: '15px',
-                        cursor: 'pointer',
-                        flexShrink: 0 // Prevent logo shrinking
-                    }}
-                    title="Ir para o Início"
-                >
-                    <img src="/senac-logo.png" alt="Senac" style={{ height: '32px', display: 'block' }} />
-                    <h1 style={{
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        color: 'var(--text-secondary)',
-                        margin: 0,
-                        whiteSpace: 'nowrap'
-                    }} className="hide-mobile">
-                        Planejamento Acadêmico
-                    </h1>
-                </div>
-
-                {/* 2. Center: Navigation (Dashboard + Links) */}
-                {/* Using flex: 1 to occupy space and justify-content: center to center the menu */}
-                <div className="hide-mobile" style={{
-                    flex: 1,
+                {/* === LEFT SECTION: LOGO + MENU === */}
+                <div className="header-left" style={{
                     display: 'flex',
-                    flexDirection: 'row',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '24px',
-                    height: '100%' // Ensure full height alignment
+                    gap: '32px', // Space between Logo and Menu
+                    height: '100%',
+                    flex: 1,
+                    overflow: 'visible' // Allow dropdowns to show
                 }}>
-                    <button
-                        onClick={() => navigate('/dashboard')}
-                        className="nav-link-btn"
+
+                    {/* Logo Area */}
+                    <div
+                        onClick={onNavigateHome}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 16px',
-                            borderRadius: '6px',
-                            fontSize: '0.9rem',
-                            fontWeight: 500,
-                            color: 'var(--text-primary)',
-                            background: 'transparent',
-                            border: 'none',
+                            gap: '12px',
                             cursor: 'pointer',
-                            whiteSpace: 'nowrap'
+                            flexShrink: 0,
+                            marginRight: '10px'
                         }}
+                        title="Ir para o Início"
                     >
-                        <LayoutGrid size={18} />
-                        Dashboard
-                    </button>
+                        <img src="/senac-logo.png" alt="Senac" style={{ height: '32px', display: 'block' }} />
+                        <h1 style={{
+                            fontSize: '1rem',
+                            fontWeight: 600,
+                            color: 'var(--text-secondary)',
+                            margin: 0,
+                            whiteSpace: 'nowrap'
+                        }} className="hide-mobile">
+                            Planejamento Acadêmico
+                        </h1>
+                    </div>
 
-                    {CATEGORY_ORDER.map(cat => {
-                        const links = groupedLinks[cat];
-                        if (!links || links.length === 0) return null;
-                        const isOpen = openCategory === cat;
+                    {/* Main Navigation Menu */}
+                    <nav className="hide-mobile" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        height: '100%'
+                    }}>
+                        {/* Dashboard Link */}
+                        <button
+                            onClick={() => navigate('/dashboard')}
+                            className="nav-link-btn"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                fontSize: '0.9rem',
+                                fontWeight: 500,
+                                color: 'var(--text-primary)',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                height: '36px'
+                            }}
+                        >
+                            <LayoutGrid size={18} />
+                            Dashboard
+                        </button>
 
-                        return (
-                            <div key={cat} style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
-                                <button
-                                    onClick={() => setOpenCategory(isOpen ? null : cat)}
-                                    className="nav-link-btn"
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        fontSize: '0.9rem',
-                                        fontWeight: 500,
-                                        color: 'var(--text-primary)',
-                                        background: isOpen ? 'var(--bg-tertiary)' : 'transparent',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    {cat} <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
-                                </button>
+                        {/* Category Dropdowns */}
+                        {CATEGORY_ORDER.map(cat => {
+                            const links = groupedLinks[cat];
+                            if (!links || links.length === 0) return null;
+                            const isOpen = openCategory === cat;
 
-                                {isOpen && (
-                                    <>
-                                        <div
-                                            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 990, cursor: 'default' }}
-                                            onClick={() => setOpenCategory(null)}
-                                        />
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: 'calc(100% + 5px)',
-                                            left: '50%',
-                                            transform: 'translateX(-50%)',
-                                            background: 'var(--bg-primary)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '8px',
-                                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                            minWidth: '220px',
-                                            zIndex: 1005,
-                                            padding: '5px',
+                            return (
+                                <div key={cat} style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
+                                    <button
+                                        onClick={() => setOpenCategory(isOpen ? null : cat)}
+                                        className="nav-link-btn"
+                                        style={{
                                             display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '2px'
-                                        }}>
-                                            {links.map(link => (
-                                                <a
-                                                    key={link.id}
-                                                    href={link.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="dropdown-item"
-                                                    style={{
-                                                        display: 'flex', alignItems: 'center', gap: '8px',
-                                                        padding: '10px 12px',
-                                                        textDecoration: 'none',
-                                                        color: 'var(--text-primary)',
-                                                        borderRadius: '6px',
-                                                        fontSize: '0.9rem',
-                                                        transition: 'background 0.2s'
-                                                    }}
-                                                    onClick={() => setOpenCategory(null)}
-                                                >
-                                                    <ExternalLink size={14} color="var(--text-secondary)" />
-                                                    {link.title}
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })}
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '8px 12px',
+                                            borderRadius: '6px',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 500,
+                                            color: 'var(--text-primary)',
+                                            background: isOpen ? 'var(--bg-tertiary)' : 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            whiteSpace: 'nowrap',
+                                            height: '36px'
+                                        }}
+                                    >
+                                        {cat} <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+                                    </button>
+
+                                    {/* Dropdown Menu */}
+                                    {isOpen && (
+                                        <>
+                                            <div
+                                                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 990, cursor: 'default' }}
+                                                onClick={() => setOpenCategory(null)}
+                                            />
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: 'calc(100% + 4px)', // Just below the button
+                                                left: 0,
+                                                background: 'var(--bg-primary)',
+                                                border: '1px solid var(--border-color)',
+                                                borderRadius: '8px',
+                                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                                minWidth: '220px',
+                                                zIndex: 1005,
+                                                padding: '6px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '2px'
+                                            }}>
+                                                {links.map(link => (
+                                                    <a
+                                                        key={link.id}
+                                                        href={link.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="dropdown-item"
+                                                        style={{
+                                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                                            padding: '10px 12px',
+                                                            textDecoration: 'none',
+                                                            color: 'var(--text-primary)',
+                                                            borderRadius: '6px',
+                                                            fontSize: '0.9rem',
+                                                            transition: 'background 0.2s'
+                                                        }}
+                                                        onClick={() => setOpenCategory(null)}
+                                                    >
+                                                        <ExternalLink size={14} color="var(--text-secondary)" />
+                                                        {link.title}
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </nav>
                 </div>
 
-                {/* 3. Right: User & Actions */}
-                <div style={{
+
+                {/* === RIGHT SECTION: ACTIONS + USER === */}
+                <div className="header-right" style={{
                     display: 'flex',
-                    flexDirection: 'row',
                     alignItems: 'center',
                     gap: '16px',
-                    flexShrink: 0 // Prevent shrinking
+                    flexShrink: 0
                 }}>
                     <button onClick={toggleTheme} className="btn-icon">
                         {isDarkMode ? <Sun size={20} color="#FFB74D" /> : <Moon size={20} color="var(--text-secondary)" />}
@@ -261,6 +272,7 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                                 }}>{notifications.length}</span>
                             )}
                         </button>
+
                         {isNotifOpen && (
                             <>
                                 <div className="notif-overlay" onClick={() => setIsNotifOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1050 }} />
@@ -280,12 +292,14 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                                         <X size={16} style={{ cursor: 'pointer' }} onClick={() => setIsNotifOpen(false)} />
                                     </div>
                                     {notifications.length > 0 ? (
-                                        notifications.map((lesson, idx) => (
-                                            <div key={idx} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)' }}>
-                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{lesson.period} - {lesson.uc || lesson.ucName}</div>
-                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>{lesson.turma} • {lesson.lab}</div>
-                                            </div>
-                                        ))
+                                        <div>
+                                            {notifications.map((lesson, idx) => (
+                                                <div key={idx} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)' }}>
+                                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{lesson.period} - {lesson.uc || lesson.ucName}</div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>{lesson.turma} • {lesson.lab}</div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     ) : (
                                         <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>Sem aulas hoje</div>
                                     )}
@@ -328,8 +342,8 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                                     overflow: 'hidden',
                                     padding: '5px'
                                 }}>
-                                    <button onClick={() => navigate('/settings')} className="dropdown-item" style={dropdownItemStyle}><Settings size={16} /> Configurações</button>
-                                    <button onClick={() => setIsImportModalOpen(true)} className="dropdown-item" style={dropdownItemStyle}><span style={{ fontSize: '1rem' }}>📥</span> Importar</button>
+                                    <button onClick={() => { setIsUserMenuOpen(false); navigate('/settings'); }} className="dropdown-item" style={dropdownItemStyle}><Settings size={16} /> Configurações</button>
+                                    <button onClick={() => { setIsUserMenuOpen(false); setIsImportModalOpen(true); }} className="dropdown-item" style={dropdownItemStyle}><span style={{ fontSize: '1rem' }}>📥</span> Importar</button>
                                     <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
                                     <button onClick={onLogout} className="dropdown-item" style={{ ...dropdownItemStyle, color: '#D32F2F' }}><LogOut size={16} /> Sair</button>
                                 </div>
@@ -347,12 +361,12 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                         .hide-mobile { display: none !important; }
                     }
                     @media (max-width: 640px) {
-                        .main-header { padding: 0 15px !important; }
+                        .main-header { padding: 0 16px !important; }
                     }
                 `}</style>
             </header>
 
-            {/* Modals outside header structure to prevent flex interference */}
+            {/* Modals */}
             <LinkManagerModal
                 isOpen={isLinkManagerOpen}
                 onClose={() => {
