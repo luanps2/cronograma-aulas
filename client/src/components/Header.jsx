@@ -43,9 +43,18 @@ export default function Header({ user, onLogout, onNavigateHome }) {
 
     const fetchTodayNotifications = async () => {
         try {
-            const today = new Date().toISOString().split('T')[0];
-            const res = await axios.get(`${API_BASE_URL}/api/lessons?date=${today}`);
-            setNotifications(res.data || []);
+            const res = await axios.get(`${API_BASE_URL}/api/lessons`);
+            const allLessons = res.data || [];
+            // Filter client-side: only today's lessons
+            const todayStr = new Date().toISOString().split('T')[0];
+            const todayLessons = allLessons.filter(lesson => {
+                if (!lesson.date) return false;
+                const lessonDate = typeof lesson.date === 'string'
+                    ? lesson.date.split('T')[0]
+                    : new Date(lesson.date).toISOString().split('T')[0];
+                return lessonDate === todayStr;
+            });
+            setNotifications(todayLessons);
         } catch (error) {
             console.error('Error fetching notifications:', error);
         }
@@ -217,53 +226,61 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                         )}
                     </button>
 
-                    {/* Notification Dropdown */}
+                    {/* Notification Panel */}
                     {isNotifOpen && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '50px',
-                            right: '0',
-                            width: '350px',
-                            maxWidth: '90vw',
-                            backgroundColor: 'var(--bg-primary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '12px',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                            zIndex: 1000,
-                            maxHeight: '500px',
-                            overflow: 'auto'
-                        }}>
-                            <div style={{ padding: '15px', borderBottom: '1px solid var(--border-color)' }}>
-                                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Aulas de Hoje</h4>
-                            </div>
-                            {notifications.length > 0 ? (
-                                <div>
-                                    {notifications.map((lesson, idx) => (
-                                        <div key={idx} style={{
-                                            padding: '15px',
-                                            borderBottom: idx < notifications.length - 1 ? '1px solid var(--border-color)' : 'none',
-                                            cursor: 'pointer',
-                                            transition: 'background 0.2s'
-                                        }}
-                                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
-                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginBottom: '5px' }}>
-                                                {lesson.date && format(new Date(lesson.date), "dd 'de' MMMM", { locale: ptBR })}
+                        <>
+                            {/* Overlay to close */}
+                            <div
+                                className="notif-overlay"
+                                onClick={() => setIsNotifOpen(false)}
+                                style={{
+                                    position: 'fixed',
+                                    top: 0, left: 0, right: 0, bottom: 0,
+                                    background: 'rgba(0,0,0,0.3)',
+                                    zIndex: 1050
+                                }}
+                            />
+                            <div className="notif-dropdown" style={{
+                                backgroundColor: 'var(--bg-primary)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '12px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                zIndex: 1060,
+                                maxHeight: '500px',
+                                overflow: 'auto'
+                            }}>
+                                <div style={{ padding: '15px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Aulas de Hoje</h4>
+                                    <button onClick={() => setIsNotifOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-tertiary)' }}>
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                                {notifications.length > 0 ? (
+                                    <div>
+                                        {notifications.map((lesson, idx) => (
+                                            <div key={idx} style={{
+                                                padding: '15px',
+                                                borderBottom: idx < notifications.length - 1 ? '1px solid var(--border-color)' : 'none',
+                                                cursor: 'pointer',
+                                                transition: 'background 0.2s'
+                                            }}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                                                <div style={{ fontWeight: 600, marginBottom: '5px' }}>{lesson.period}</div>
+                                                <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>Lab:</strong> {lesson.lab}</div>
+                                                <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>Turma:</strong> {lesson.turma}</div>
+                                                <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>UC:</strong> {lesson.uc || lesson.ucName}</div>
+                                                {lesson.description && <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: '5px' }}>{lesson.description}</div>}
                                             </div>
-                                            <div style={{ fontWeight: 600, marginBottom: '5px' }}>{lesson.period}</div>
-                                            <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>Lab:</strong> {lesson.lab}</div>
-                                            <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>Turma:</strong> {lesson.turma}</div>
-                                            <div style={{ fontSize: '0.9rem', marginBottom: '3px' }}><strong>UC:</strong> {lesson.uc}</div>
-                                            {lesson.description && <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: '5px' }}>{lesson.description}</div>}
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-                                    Nenhuma aula agendada para hoje
-                                </div>
-                            )}
-                        </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                                        Nenhuma aula agendada para hoje
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
 
@@ -366,6 +383,27 @@ export default function Header({ user, onLogout, onNavigateHome }) {
             <style>{`
                 .main-header {
                     width: 100% !important;
+                }
+
+                /* Notification dropdown - desktop: absolute, mobile: centered modal */
+                .notif-dropdown {
+                    position: absolute;
+                    top: 50px;
+                    right: 0;
+                    width: 350px;
+                    max-width: 90vw;
+                }
+
+                @media (max-width: 640px) {
+                    .notif-dropdown {
+                        position: fixed !important;
+                        top: 50% !important;
+                        left: 50% !important;
+                        right: auto !important;
+                        transform: translate(-50%, -50%) !important;
+                        width: 90vw !important;
+                        max-height: 80vh !important;
+                    }
                 }
 
                 @media (max-width: 900px) {

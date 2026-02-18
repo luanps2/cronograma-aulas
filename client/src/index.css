@@ -322,8 +322,7 @@ select {
   }
 
   .calendar-day {
-    min-height: 100px;
-    max-height: 140px;
+    min-height: 90px;
     padding: 4px;
     overflow-y: auto;
     overflow-x: hidden;
@@ -334,10 +333,9 @@ select {
     margin-bottom: 4px;
   }
 
-  /* Event Cards - Uniform height and better readability */
+  /* Event Cards - Compact but readable */
   .event-card {
-    min-height: 70px !important;
-    max-height: 70px !important;
+    min-height: auto !important;
     padding: 4px !important;
     font-size: 0.7rem !important;
     overflow: hidden;

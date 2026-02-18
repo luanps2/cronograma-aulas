@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, Settings, BookOpen, Users, Monitor, GraduationCap, ChevronLeft, ChevronRight, List as ListIcon, LayoutGrid } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Upload, Settings, BookOpen, Users, Monitor, GraduationCap, ChevronLeft, ChevronRight, List as ListIcon, LayoutGrid, GripVertical, CalendarDays } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import axios from 'axios';
@@ -24,6 +24,13 @@ export default function CalendarPage({ user, onLogout }) {
     const [calendarViewMode, setCalendarViewMode] = useState('grid');
     const [selectedLesson, setSelectedLesson] = useState(null);
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: null });
+
+    // Drag and Drop state
+    const [draggedLesson, setDraggedLesson] = useState(null);
+    const [dragOverDate, setDragOverDate] = useState(null);
+
+    // Mobile move mode
+    const [movingLesson, setMovingLesson] = useState(null);
 
     // Filter states
     const [allClasses, setAllClasses] = useState([]);
@@ -50,6 +57,12 @@ export default function CalendarPage({ user, onLogout }) {
     };
 
     const handleDateClick = (date) => {
+        // If in "moving" mode, move the lesson to the clicked date
+        if (movingLesson) {
+            handleMoveLesson(movingLesson, date);
+            setMovingLesson(null);
+            return;
+        }
         setSelectedDateForModal(date);
         setSelectedLesson(null);
         setIsNewLessonModalOpen(true);
@@ -57,10 +70,95 @@ export default function CalendarPage({ user, onLogout }) {
 
     const handleLessonSelect = (lesson, e) => {
         e.stopPropagation();
+        if (movingLesson) {
+            setMovingLesson(null);
+            return;
+        }
         setSelectedLesson(lesson);
         setSelectedDateForModal(new Date(lesson.date));
         setIsNewLessonModalOpen(true);
     }
+
+    // ========== DRAG AND DROP ==========
+    const handleDragStart = (e, lesson) => {
+        setDraggedLesson(lesson);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', JSON.stringify({ id: lesson.id }));
+        // Add visual feedback
+        if (e.currentTarget) {
+            setTimeout(() => {
+                e.currentTarget.style.opacity = '0.5';
+            }, 0);
+        }
+    };
+
+    const handleDragEnd = (e) => {
+        setDraggedLesson(null);
+        setDragOverDate(null);
+        if (e.currentTarget) {
+            e.currentTarget.style.opacity = '1';
+        }
+    };
+
+    const handleDragOver = (e, dayItem) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setDragOverDate(dayItem);
+    };
+
+    const handleDragLeave = () => {
+        setDragOverDate(null);
+    };
+
+    const handleDrop = async (e, targetDate) => {
+        e.preventDefault();
+        setDragOverDate(null);
+
+        if (!draggedLesson) return;
+
+        // Don't do anything if same date
+        if (isSameDay(draggedLesson.date, targetDate)) {
+            setDraggedLesson(null);
+            return;
+        }
+
+        await handleMoveLesson(draggedLesson, targetDate);
+        setDraggedLesson(null);
+    };
+
+    const handleMoveLesson = async (lesson, targetDate) => {
+        try {
+            const payload = {
+                courseId: parseInt(lesson.courseId),
+                ucId: parseInt(lesson.ucId),
+                turma: lesson.turma,
+                lab: lesson.lab,
+                period: lesson.period,
+                description: lesson.description || '',
+                date: targetDate.toISOString()
+            };
+
+            await axios.put(`${API_BASE_URL}/api/lessons/${lesson.id}`, payload);
+
+            // Update local state immediately
+            setLessons(prev => prev.map(l =>
+                l.id === lesson.id ? { ...l, date: targetDate } : l
+            ));
+
+            // Dispatch event for other components
+            window.dispatchEvent(new Event('lessons-updated'));
+        } catch (err) {
+            console.error('Error moving lesson:', err);
+            alert('Erro ao mover aula: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    // Mobile: long press to trigger move
+    const handleLongPress = (lesson, e) => {
+        e.stopPropagation();
+        setMovingLesson(lesson);
+    };
+    // ========== END DRAG AND DROP ==========
 
     const openQuickAdd = async (type) => {
         setQuickAddType(type);
@@ -134,7 +232,6 @@ export default function CalendarPage({ user, onLogout }) {
 
     useEffect(() => {
         const handleUpdates = () => {
-            console.log('🔄 Refreshing lessons due to global event...');
             fetchLessons();
             fetchCourses();
         };
@@ -146,7 +243,37 @@ export default function CalendarPage({ user, onLogout }) {
     return (
         <>
             <div className="calendar-page-container">
-                {/* Filters Section - Always first */}
+                {/* Moving mode banner */}
+                {movingLesson && (
+                    <div style={{
+                        background: '#FFF3E0',
+                        border: '2px solid #FF9800',
+                        borderRadius: '8px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        marginBottom: '10px',
+                        flexWrap: 'wrap'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#E65100' }}>
+                            <CalendarDays size={18} />
+                            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                                Movendo: <strong>{movingLesson.turma}</strong> — Clique na data de destino
+                            </span>
+                        </div>
+                        <button
+                            onClick={() => setMovingLesson(null)}
+                            className="btn-outline"
+                            style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                )}
+
+                {/* Filters Section */}
                 <div className="filters-section" style={{ background: 'var(--bg-primary)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 500 }}>Filtrar por:</span>
                     <select value={filters.turma} onChange={(e) => setFilters(prev => ({ ...prev, turma: e.target.value }))} style={{ padding: '8px 12px', borderRadius: '6px', minWidth: '150px' }}>
@@ -173,7 +300,7 @@ export default function CalendarPage({ user, onLogout }) {
                     </div>
                 </div>
 
-                {/* Calendar Section - Order 1 on mobile, 2 on desktop */}
+                {/* Calendar Section */}
                 <div className="calendar-section">
                     <div style={{ background: 'var(--bg-primary)', borderRadius: '12px 12px 0 0', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderBottom: 'none' }}>
                         <button className="btn-outline" onClick={prevMonth} style={{ width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}><ChevronLeft /></button>
@@ -192,7 +319,6 @@ export default function CalendarPage({ user, onLogout }) {
                                     const isCurrentMonth = isSameMonth(dayItem, monthStart);
                                     let dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
 
-                                    // Apply filters
                                     if (filters.turma) {
                                         dayLessons = dayLessons.filter(l => l.turma === filters.turma);
                                     }
@@ -201,18 +327,31 @@ export default function CalendarPage({ user, onLogout }) {
                                     }
 
                                     const isTodayDate = isToday(dayItem);
+                                    const isDragTarget = dragOverDate && isSameDay(dragOverDate, dayItem);
+                                    const isMovingTarget = movingLesson !== null;
 
                                     return (
                                         <div
                                             key={idx}
-                                            className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${isTodayDate ? 'calendar-day-today' : ''}`}
+                                            className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${isTodayDate ? 'calendar-day-today' : ''} ${isDragTarget ? 'calendar-day-drag-over' : ''} ${isMovingTarget ? 'calendar-day-move-target' : ''}`}
                                             onClick={() => handleDateClick(dayItem)}
-                                            style={{ cursor: 'pointer' }}
+                                            onDragOver={(e) => handleDragOver(e, dayItem)}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={(e) => handleDrop(e, dayItem)}
+                                            style={{ cursor: isMovingTarget ? 'crosshair' : 'pointer' }}
                                         >
                                             <span className="day-number">{format(dayItem, 'd')}</span>
                                             <div className="day-events">
                                                 {dayLessons.map((lesson, lIdx) => (
-                                                    <LessonCard key={lIdx} lesson={lesson} onClick={(e) => handleLessonSelect(lesson, e)} />
+                                                    <LessonCard
+                                                        key={lIdx}
+                                                        lesson={lesson}
+                                                        onClick={(e) => handleLessonSelect(lesson, e)}
+                                                        onDragStart={(e) => handleDragStart(e, lesson)}
+                                                        onDragEnd={handleDragEnd}
+                                                        onLongPress={(e) => handleLongPress(lesson, e)}
+                                                        isBeingDragged={draggedLesson && draggedLesson.id === lesson.id}
+                                                    />
                                                 ))}
                                             </div>
                                         </div>
@@ -224,7 +363,6 @@ export default function CalendarPage({ user, onLogout }) {
                                 {calendarDays.filter(d => isSameMonth(d, monthStart)).map((dayItem, idx) => {
                                     let dayLessons = lessons.filter(l => isSameDay(l.date, dayItem));
 
-                                    // Apply filters
                                     if (filters.turma) {
                                         dayLessons = dayLessons.filter(l => l.turma === filters.turma);
                                     }
@@ -234,7 +372,7 @@ export default function CalendarPage({ user, onLogout }) {
 
                                     if (dayLessons.length === 0) return null;
                                     return (
-                                        <div key={idx} style={{ padding: '15px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '20px', flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
+                                        <div key={idx} className="list-view-day">
                                             <div style={{ minWidth: '60px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                                 <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>{format(dayItem, 'd')}</div>
                                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{format(dayItem, 'EEE', { locale: ptBR })}</div>
@@ -255,7 +393,7 @@ export default function CalendarPage({ user, onLogout }) {
                     }
                 </div>
 
-                {/* Shortcut Cards Section - Order 2 on mobile, 1 on desktop */}
+                {/* Shortcut Cards */}
                 <div className="shortcuts-section">
                     <ShortcutCard icon={<GraduationCap color="#5E35B1" size={20} />} label="Curso" color="#EDE7F6" onClick={() => openQuickAdd('courses')} />
                     <ShortcutCard icon={<Users color="#3949AB" size={20} />} label="Turma" color="#E8EAF6" onClick={() => openQuickAdd('classes')} />
@@ -288,7 +426,7 @@ export default function CalendarPage({ user, onLogout }) {
             />
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
-                onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
                 title={confirmModal.title}
                 message={confirmModal.message}
                 type={confirmModal.type}
@@ -303,13 +441,8 @@ export default function CalendarPage({ user, onLogout }) {
                     gap: 20px;
                 }
 
-                .filters-section {
-                    order: 1;
-                }
-
-                .calendar-section {
-                    order: 2;
-                }
+                .filters-section { order: 1; }
+                .calendar-section { order: 2; }
 
                 .shortcuts-section {
                     order: 3;
@@ -318,6 +451,7 @@ export default function CalendarPage({ user, onLogout }) {
                     gap: 20px;
                 }
 
+                /* Calendar Grid */
                 .calendar-grid {
                     display: grid;
                     grid-template-columns: repeat(7, 1fr);
@@ -335,11 +469,10 @@ export default function CalendarPage({ user, onLogout }) {
                     border-bottom: 1px solid var(--border-color);
                     position: relative;
                     overflow-y: auto;
+                    transition: background-color 0.15s;
                 }
 
-                .calendar-day:nth-child(7n) {
-                    border-right: none;
-                }
+                .calendar-day:nth-child(7n) { border-right: none; }
 
                 .calendar-day-header {
                     font-weight: 600;
@@ -351,13 +484,24 @@ export default function CalendarPage({ user, onLogout }) {
                     color: var(--text-primary);
                 }
 
-                .calendar-day-header:nth-child(7n) {
-                    border-right: none;
-                }
+                .calendar-day-header:nth-child(7n) { border-right: none; }
 
                 .calendar-day-today {
                     background: #E3F2FD !important;
                     border: 2px solid #2196F3 !important;
+                }
+
+                /* Drag & Drop target highlight */
+                .calendar-day-drag-over {
+                    background: rgba(33, 150, 243, 0.15) !important;
+                    outline: 2px dashed #2196F3 !important;
+                    outline-offset: -2px;
+                }
+
+                .calendar-day-move-target:hover {
+                    background: rgba(255, 152, 0, 0.1) !important;
+                    outline: 2px dashed #FF9800 !important;
+                    outline-offset: -2px;
                 }
 
                 .day-number {
@@ -375,11 +519,47 @@ export default function CalendarPage({ user, onLogout }) {
                     margin-top: 6px;
                 }
 
-                /* Mobile: Calendar first, shortcuts after */
+                .list-view-day {
+                    padding: 15px;
+                    border-bottom: 1px solid var(--border-color);
+                    display: flex;
+                    gap: 20px;
+                }
+
+                /* Drag handle for lesson cards */
+                .lesson-drag-handle {
+                    cursor: grab;
+                    opacity: 0.4;
+                    transition: opacity 0.2s;
+                }
+
+                .event-card:hover .lesson-drag-handle {
+                    opacity: 1;
+                }
+
+                .event-card[draggable="true"] {
+                    cursor: grab;
+                }
+
+                .event-card[draggable="true"]:active {
+                    cursor: grabbing;
+                }
+
+                /* Mobile move button */
+                .move-btn {
+                    background: none;
+                    border: 1px solid var(--border-color);
+                    border-radius: 4px;
+                    padding: 2px 6px;
+                    font-size: 0.65rem;
+                    cursor: pointer;
+                    color: var(--text-tertiary);
+                    display: none;
+                }
+
+                /* Mobile Responsive */
                 @media (max-width: 640px) {
-                    .calendar-section {
-                        order: 2;
-                    }
+                    .calendar-section { order: 2; }
 
                     .shortcuts-section {
                         order: 3;
@@ -389,36 +569,68 @@ export default function CalendarPage({ user, onLogout }) {
                     }
 
                     .calendar-day {
-                        min-height: 100px;
-                        padding: 6px;
+                        min-height: 90px;
+                        padding: 4px;
+                        overflow-y: auto;
+                        overflow-x: hidden;
                     }
-                    
+
                     .day-number {
-                        font-size: 0.85rem;
+                        font-size: 0.8rem;
                     }
-                    
+
                     .event-card {
-                        min-height: 70px !important;
                         padding: 4px !important;
+                        font-size: 0.7rem !important;
+                    }
+
+                    .event-card strong {
+                        font-size: 0.65rem !important;
+                    }
+
+                    .event-card div {
+                        line-height: 1.1 !important;
+                    }
+
+                    .day-events {
+                        gap: 3px;
+                    }
+
+                    .move-btn {
+                        display: inline-block;
+                    }
+
+                    .list-view-day {
+                        flex-direction: column;
+                        gap: 10px;
                     }
                 }
 
-                /* Desktop: Keep original order */
+                /* Desktop order */
                 @media (min-width: 641px) {
-                    .shortcuts-section {
-                        order: 2;
-                    }
-
-                    .calendar-section {
-                        order: 3;
-                    }
+                    .shortcuts-section { order: 2; }
+                    .calendar-section { order: 3; }
                 }
             `}</style>
         </>
     )
 }
 
-function LessonCard({ lesson, horizontal, onClick }) {
+function LessonCard({ lesson, horizontal, onClick, onDragStart, onDragEnd, onLongPress, isBeingDragged }) {
+    const longPressTimeout = useRef(null);
+
+    const handleTouchStart = (e) => {
+        longPressTimeout.current = setTimeout(() => {
+            if (onLongPress) onLongPress(e);
+        }, 600);
+    };
+
+    const handleTouchEnd = () => {
+        if (longPressTimeout.current) {
+            clearTimeout(longPressTimeout.current);
+        }
+    };
+
     if (horizontal) {
         return (
             <div
@@ -437,7 +649,7 @@ function LessonCard({ lesson, horizontal, onClick }) {
                 }}>
                 <div style={{ width: '60px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-primary)' }}>{lesson.period}</div>
                 <div style={{ width: '80px', fontWeight: 'bold', fontSize: '0.95rem', color: 'var(--text-primary)' }}>{lesson.turma}</div>
-                <div style={{ flex: 1, minWidth: '150px', fontWeight: '500', color: 'var(--text-secondary)' }}>{lesson.uc}</div>
+                <div style={{ flex: 1, minWidth: '150px', fontWeight: '500', color: 'var(--text-secondary)' }}>{lesson.uc || lesson.ucName}</div>
                 <div style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{lesson.lab}</div>
                 {lesson.description && (
                     <div style={{
@@ -466,6 +678,12 @@ function LessonCard({ lesson, horizontal, onClick }) {
     return (
         <div
             onClick={onClick}
+            draggable="true"
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onTouchMove={handleTouchEnd}
             className={`event-card ${getPeriodClass(lesson.period)}`}
             style={{
                 display: 'flex',
@@ -473,25 +691,34 @@ function LessonCard({ lesson, horizontal, onClick }) {
                 gap: '2px',
                 padding: '6px',
                 borderRadius: '6px',
-                minHeight: '80px'
+                minHeight: '80px',
+                opacity: isBeingDragged ? 0.4 : 1,
+                transition: 'opacity 0.2s'
             }}
         >
-            {/* 1. PERÍODO (first) */}
+            {/* Period */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
                 {lesson.period === 'Noite' ? <span style={{ fontSize: '0.8rem' }}>🌙</span> : <span style={{ fontSize: '0.8rem' }}>☀️</span>}
                 <strong style={{ fontSize: '0.75rem' }}>{lesson.period}</strong>
+                <button
+                    className="move-btn"
+                    onClick={(e) => { e.stopPropagation(); if (onLongPress) onLongPress(e); }}
+                    title="Mover aula"
+                >
+                    ⇄
+                </button>
             </div>
 
-            {/* 2. LABORATÓRIO (second) */}
+            {/* Lab */}
             <div style={{ fontSize: '0.7rem', opacity: 0.9, fontWeight: '600' }}>{lesson.lab}</div>
 
-            {/* 3. TURMA (third) */}
+            {/* Turma */}
             <div style={{ fontWeight: '700', fontSize: '0.85rem', lineHeight: '1.2' }}>{lesson.turma}</div>
 
-            {/* 4. UC (fourth - MANDATORY, always visible) */}
-            <div style={{ fontSize: '0.75rem', lineHeight: '1.2', margin: '2px 0', fontWeight: '500' }}>{lesson.uc}</div>
+            {/* UC */}
+            <div style={{ fontSize: '0.75rem', lineHeight: '1.2', margin: '2px 0', fontWeight: '500' }}>{lesson.uc || lesson.ucName}</div>
 
-            {/* 5. DESCRIÇÃO (last, optional) */}
+            {/* Description */}
             {lesson.description && (
                 <div style={{
                     width: '100%',

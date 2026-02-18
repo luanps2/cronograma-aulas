@@ -92,6 +92,16 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = '60
                 )}
                 <div style={{ flex: 1, overflowY: 'auto' }}>{children}</div>
             </div>
+
+            <style>{`
+                @media (max-width: 640px) {
+                    .modal {
+                        max-height: 95vh !important;
+                        border-radius: 12px !important;
+                        margin: 0 !important;
+                    }
+                }
+            `}</style>
         </div>
     );
 

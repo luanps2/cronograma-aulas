@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import ConfirmModal from './ConfirmModal';
@@ -19,24 +19,27 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
     });
 
     const [courses, setCourses] = useState([]);
-    const [allUcs, setAllUcs] = useState([]); // Base state for UCs
-    const [visibleUcs, setVisibleUcs] = useState([]); // Filtered UCs
-    const [allClasses, setAllClasses] = useState([]); // Base state for Classes
-    const [visibleClasses, setVisibleClasses] = useState([]); // Filtered Classes
+    const [allUcs, setAllUcs] = useState([]);
+    const [visibleUcs, setVisibleUcs] = useState([]);
+    const [allClasses, setAllClasses] = useState([]);
+    const [visibleClasses, setVisibleClasses] = useState([]);
     const [labs, setLabs] = useState([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [dataReady, setDataReady] = useState(false);
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: null });
 
+    // Reset everything when modal opens
     useEffect(() => {
         if (isOpen) {
+            setDataReady(false);
             if (isEditing && lesson) {
                 setFormData({
-                    courseId: lesson.courseId,
-                    ucId: lesson.ucId,
-                    turma: lesson.turma,
-                    lab: lesson.lab,
-                    period: lesson.period,
+                    courseId: String(lesson.courseId || ''),
+                    ucId: String(lesson.ucId || ''),
+                    turma: lesson.turma || '',
+                    lab: lesson.lab || '',
+                    period: lesson.period || '',
                     description: lesson.description || '',
                     date: lesson.date ? new Date(lesson.date) : new Date()
                 });
@@ -53,7 +56,7 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
             }
             fetchOptions();
         }
-    }, [isOpen, lesson, initialDate, isEditing]);
+    }, [isOpen, lesson, initialDate]);
 
     const fetchOptions = async () => {
         setLoading(true);
@@ -64,24 +67,11 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                 axios.get(`${API_BASE_URL}/api/settings/ucs`),
                 axios.get(`${API_BASE_URL}/api/settings/labs`)
             ]);
-            setCourses(coursesRes.data);
-            setAllClasses(classesRes.data);
-            setAllUcs(ucsRes.data);
-            setLabs(labsRes.data);
-
-            // If editing, immediately filter for current courseId
-            if (isEditing && lesson && lesson.courseId) {
-                const filteredClasses = classesRes.data.filter(cls => {
-                    const cId = cls.courseId || cls.course?._id || cls.course?.id;
-                    return cId && String(cId) === String(lesson.courseId);
-                });
-                const filteredUcs = ucsRes.data.filter(uc => {
-                    const cId = uc.courseId || uc.course?._id || uc.course?.id;
-                    return cId && String(cId) === String(lesson.courseId);
-                });
-                setVisibleClasses(filteredClasses);
-                setVisibleUcs(filteredUcs);
-            }
+            setCourses(coursesRes.data || []);
+            setAllClasses(classesRes.data || []);
+            setAllUcs(ucsRes.data || []);
+            setLabs(labsRes.data || []);
+            setDataReady(true);
         } catch (err) {
             console.error('Error fetching options:', err);
         } finally {
@@ -89,33 +79,56 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
         }
     };
 
-    // FILTER LOGIC: Updates visibleClasses based on courseId and allClasses
+    // FILTER LOGIC: Updates visibleClasses based on courseId
+    // Only runs when data is ready (prevents race condition)
     useEffect(() => {
+        if (!dataReady) return;
+
         if (!formData.courseId) {
             setVisibleClasses([]);
             return;
         }
 
+        const courseIdStr = String(formData.courseId);
         const filtered = allClasses.filter(cls => {
-            const cId = cls.courseId || cls.course?._id || cls.course?.id;
-            return cId && String(cId) === String(formData.courseId);
+            const cId = String(cls.courseId || cls.course?.id || cls.course?._id || '');
+            return cId === courseIdStr;
         });
         setVisibleClasses(filtered);
-    }, [formData.courseId, allClasses]);
+    }, [formData.courseId, allClasses, dataReady]);
 
-    // FILTER LOGIC: Updates visibleUcs based on courseId and allUcs
+    // FILTER LOGIC: Updates visibleUcs based on courseId
     useEffect(() => {
+        if (!dataReady) return;
+
         if (!formData.courseId) {
             setVisibleUcs([]);
             return;
         }
 
+        const courseIdStr = String(formData.courseId);
         const filtered = allUcs.filter(uc => {
-            const cId = uc.courseId || uc.course?._id || uc.course?.id;
-            return cId && String(cId) === String(formData.courseId);
+            const cId = String(uc.courseId || uc.course?.id || uc.course?._id || '');
+            return cId === courseIdStr;
         });
         setVisibleUcs(filtered);
-    }, [formData.courseId, allUcs]);
+    }, [formData.courseId, allUcs, dataReady]);
+
+    const handleCourseChange = (newCourseId) => {
+        setFormData(prev => ({
+            ...prev,
+            courseId: newCourseId,
+            turma: '',  // Reset Turma
+            ucId: ''    // Reset UC
+        }));
+    };
+
+    const handleClassChange = (val) => {
+        setFormData(prev => ({
+            ...prev,
+            turma: val
+        }));
+    };
 
     const handleChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -135,7 +148,7 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                 lab: formData.lab,
                 period: formData.period,
                 description: formData.description,
-                date: formData.date.toISOString()
+                date: formData.date instanceof Date ? formData.date.toISOString() : new Date(formData.date).toISOString()
             };
 
             if (isEditing && lesson?.id) {
@@ -148,7 +161,8 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
             onClose();
         } catch (err) {
             console.error('Error saving lesson:', err);
-            alert('Erro ao salvar aula. Tente novamente.');
+            const msg = err.response?.data?.error || 'Erro ao salvar aula. Tente novamente.';
+            alert(msg);
         } finally {
             setSaving(false);
         }
@@ -174,7 +188,7 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
             message: 'Tem certeza que deseja excluir esta aula? Esta ação não pode ser desfeita.',
             confirmText: 'Excluir',
             onConfirm: () => {
-                setConfirmModal({ ...confirmModal, isOpen: false });
+                setConfirmModal(prev => ({ ...prev, isOpen: false }));
                 handleDelete();
             }
         });
@@ -193,6 +207,21 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
         </div>
     );
 
+    const selectStyle = {
+        width: '100%',
+        padding: '10px',
+        borderRadius: '8px',
+        fontSize: '0.9rem'
+    };
+
+    const labelStyle = {
+        display: 'block',
+        fontWeight: 500,
+        marginBottom: '6px',
+        fontSize: '0.85rem',
+        color: 'var(--text-tertiary)'
+    };
+
     return (
         <>
             <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} maxWidth="540px">
@@ -201,64 +230,51 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                         <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 className="animate-spin" /> Carregando opções...</div>
                     ) : (
                         <>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                            {/* Curso + Turma */}
+                            <div className="modal-row-2col">
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Curso *</label>
+                                    <label style={labelStyle}>Curso *</label>
                                     <select
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.9rem' }}
-                                        onChange={(e) => {
-                                            const newCourseId = e.target.value;
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                courseId: newCourseId,
-                                                turma: '', // Reset Turma
-                                                ucId: ''   // Reset UC
-                                            }));
-                                        }}
+                                        style={selectStyle}
+                                        onChange={(e) => handleCourseChange(e.target.value)}
                                         value={formData.courseId}
                                     >
                                         <option value="">Selecione o Curso</option>
-                                        {courses.map(c => <option key={c.id || c._id} value={c.id || c._id}>{c.acronym}</option>)}
+                                        {courses.map(c => (
+                                            <option key={c.id || c._id} value={String(c.id || c._id)}>
+                                                {c.acronym || c.name}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Turma *</label>
+                                    <label style={labelStyle}>Turma *</label>
                                     <select
                                         style={{
-                                            width: '100%',
-                                            padding: '10px',
-                                            borderRadius: '8px',
-                                            fontSize: '0.9rem',
+                                            ...selectStyle,
                                             opacity: !formData.courseId ? 0.6 : 1
                                         }}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                turma: val,
-                                                ucId: '' // Reset UC when Class changes
-                                            }));
-                                        }}
+                                        onChange={(e) => handleClassChange(e.target.value)}
                                         value={formData.turma}
-                                        disabled={!formData.courseId} // Disabled if no course
+                                        disabled={!formData.courseId}
                                     >
                                         <option value="">Selecione a Turma</option>
                                         {visibleClasses.map(cls => (
-                                            <option key={cls.id || cls._id} value={cls.name}>{cls.name}</option>
+                                            <option key={cls.id || cls._id} value={cls.name}>
+                                                {cls.name}
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
                             </div>
 
+                            {/* UC */}
                             <div>
-                                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Unidade Curricular (UC) *</label>
+                                <label style={labelStyle}>Unidade Curricular (UC) *</label>
                                 <select
                                     disabled={!formData.courseId}
                                     style={{
-                                        width: '100%',
-                                        padding: '10px',
-                                        borderRadius: '8px',
-                                        fontSize: '0.9rem',
+                                        ...selectStyle,
                                         opacity: !formData.courseId ? 0.6 : 1
                                     }}
                                     onChange={(e) => handleChange('ucId', e.target.value)}
@@ -266,29 +282,32 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                                 >
                                     <option value="">{formData.courseId ? 'Selecione uma UC...' : 'Selecione primeiro o curso'}</option>
                                     {visibleUcs.map(uc => (
-                                        <option key={uc.id} value={uc.id}>{uc.name} - {uc.desc}</option>
+                                        <option key={uc.id || uc._id} value={String(uc.id || uc._id)}>
+                                            {uc.name}{uc.desc ? ` - ${uc.desc}` : ''}
+                                        </option>
                                     ))}
                                 </select>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                            {/* Lab + Período */}
+                            <div className="modal-row-2col">
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Laboratório *</label>
+                                    <label style={labelStyle}>Laboratório *</label>
                                     <select
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.9rem' }}
+                                        style={selectStyle}
                                         onChange={(e) => handleChange('lab', e.target.value)}
                                         value={formData.lab}
                                     >
                                         <option value="">Selecione</option>
                                         {labs.map(lab => (
-                                            <option key={lab.id} value={lab.name}>{lab.name}</option>
+                                            <option key={lab.id || lab._id} value={lab.name}>{lab.name}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Período *</label>
+                                    <label style={labelStyle}>Período *</label>
                                     <select
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.9rem' }}
+                                        style={selectStyle}
                                         onChange={(e) => handleChange('period', e.target.value)}
                                         value={formData.period}
                                     >
@@ -300,8 +319,9 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                                 </div>
                             </div>
 
+                            {/* Descrição */}
                             <div>
-                                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Plano de Aula</label>
+                                <label style={labelStyle}>Plano de Aula</label>
                                 <textarea
                                     placeholder="Conteúdo programático da aula..."
                                     rows={3}
@@ -314,13 +334,14 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                     )}
                 </div>
 
-                <div style={{ padding: '20px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: isEditing ? 'space-between' : 'flex-end', gap: '10px', background: 'var(--bg-tertiary)', borderRadius: '0 0 16px 16px' }}>
+                {/* Footer buttons */}
+                <div className="modal-footer">
                     {isEditing && (
-                        <button onClick={handleDeleteClick} className="btn-outline" style={{ color: '#D32F2F', borderColor: '#FFCDD2', background: '#FFEBEE' }}>
+                        <button onClick={handleDeleteClick} className="btn-outline modal-btn-delete" style={{ color: '#D32F2F', borderColor: '#FFCDD2', background: '#FFEBEE' }}>
                             <Trash2 size={18} /> Excluir
                         </button>
                     )}
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    <div className="modal-footer-actions">
                         <button className="btn-outline" onClick={onClose} disabled={saving}>Cancelar</button>
                         <button className="btn-primary" onClick={handleSave} disabled={saving}>
                             {saving ? 'Salvando...' : (isEditing ? 'Atualizar Aula' : 'Criar Aula')}
@@ -331,13 +352,66 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
 
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
-                onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
                 title={confirmModal.title}
                 message={confirmModal.message}
                 type={confirmModal.type}
                 confirmText={confirmModal.confirmText}
                 onConfirm={confirmModal.onConfirm}
             />
+
+            <style>{`
+                .modal-row-2col {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 15px;
+                }
+
+                .modal-footer {
+                    padding: 16px 20px;
+                    border-top: 1px solid var(--border-color);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 10px;
+                    background: var(--bg-tertiary);
+                    border-radius: 0 0 16px 16px;
+                }
+
+                .modal-footer-actions {
+                    display: flex;
+                    gap: 10px;
+                    margin-left: auto;
+                }
+
+                @media (max-width: 640px) {
+                    .modal-row-2col {
+                        grid-template-columns: 1fr !important;
+                        gap: 12px !important;
+                    }
+
+                    .modal-footer {
+                        flex-direction: column !important;
+                        gap: 10px !important;
+                        padding: 16px !important;
+                    }
+
+                    .modal-footer-actions {
+                        width: 100%;
+                        margin-left: 0;
+                    }
+
+                    .modal-footer-actions button,
+                    .modal-btn-delete {
+                        width: 100% !important;
+                        justify-content: center !important;
+                    }
+
+                    .modal-footer-actions {
+                        flex-direction: column;
+                    }
+                }
+            `}</style>
         </>
     );
 }
