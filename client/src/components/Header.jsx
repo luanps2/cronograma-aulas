@@ -87,6 +87,8 @@ export default function Header({ user, onLogout, onNavigateHome }) {
             padding: '0 20px',
             height: '80px',
             display: 'flex',
+            flexDirection: 'row', // FORCE ROW
+            flexWrap: 'nowrap',   // FORCE NO WRAP
             alignItems: 'center',
             justifyContent: 'space-between',
             position: 'sticky',
@@ -99,7 +101,7 @@ export default function Header({ user, onLogout, onNavigateHome }) {
             {/* Left: Logo & Branding */}
             <div
                 onClick={onNavigateHome}
-                style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer', marginRight: '20px' }}
+                style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '15px', cursor: 'pointer', marginRight: '20px', flexShrink: 0 }}
                 title="Ir para o Início"
             >
                 <img src="/senac-logo.png" alt="Senac" style={{ height: '48px' }} />
@@ -109,6 +111,7 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                     fontWeight: 600,
                     color: 'var(--text-secondary)',
                     margin: 0,
+                    display: 'flex', // Enforce flex
                     alignItems: 'center',
                     gap: '8px'
                 }} className="hide-mobile">
@@ -117,7 +120,7 @@ export default function Header({ user, onLogout, onNavigateHome }) {
             </div>
 
             {/* Center: Dynamic Links + Dashboard */}
-            <div className="header-links-area hide-mobile" style={{ flex: 1, display: 'flex', gap: '5px', justifyContent: 'center', alignItems: 'center' }}>
+            <div className="header-links-area hide-mobile" style={{ flex: 1, display: 'flex', flexDirection: 'row', gap: '24px', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap' }}>
                 {/* Dashboard Button - NOW VISIBLE */}
                 <button
                     onClick={() => navigate('/dashboard')}
@@ -128,7 +131,8 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                         backgroundColor: 'transparent',
                         transition: '0.2s',
                         border: 'none',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
                     }}
                     className="nav-link-btn"
                     title="Ir para Dashboard"
@@ -151,12 +155,14 @@ export default function Header({ user, onLogout, onNavigateHome }) {
                                     padding: '8px 12px', borderRadius: '6px',
                                     fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)',
                                     backgroundColor: isOpen ? 'var(--bg-tertiary)' : 'transparent',
-                                    transition: '0.2s'
+                                    transition: '0.2s',
+                                    whiteSpace: 'nowrap'
                                 }}
                                 className="nav-link-btn"
                             >
                                 {cat} <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
                             </button>
+
 
                             {isOpen && (
                                 <>
