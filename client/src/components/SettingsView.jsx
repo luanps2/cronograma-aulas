@@ -35,6 +35,11 @@ export default function SettingsView({ onBack, onRefresh }) {
     const [clearModal, setClearModal] = useState({ isOpen: false, year: new Date().getFullYear(), month: new Date().getMonth() });
     const [clearing, setClearing] = useState(false);
 
+    // Clear Year State
+    const [yearSelectionModal, setYearSelectionModal] = useState({ isOpen: false, year: new Date().getFullYear() });
+    const [clearYearModal, setClearYearModal] = useState({ isOpen: false, year: new Date().getFullYear() });
+    const [clearingYear, setClearingYear] = useState(false);
+
     useEffect(() => {
         fetchAll();
     }, []);
@@ -164,6 +169,35 @@ export default function SettingsView({ onBack, onRefresh }) {
             alert(`Erro ao limpar calendário: ${msg}`);
         } finally {
             setClearing(false);
+        }
+    };
+
+    // ===== CLEAR YEAR HANDLERS =====
+    const handleOpenClearYear = () => {
+        setYearSelectionModal({ isOpen: true, year: new Date().getFullYear() });
+    };
+
+    const handleProceedClearYear = () => {
+        setYearSelectionModal({ ...yearSelectionModal, isOpen: false });
+        setClearYearModal({ isOpen: true, year: yearSelectionModal.year });
+    };
+
+    const handleClearYear = async () => {
+        setClearingYear(true);
+        try {
+            const res = await axios.delete(`${API_BASE_URL}/api/admin/clear-year`, {
+                data: { year: clearYearModal.year }
+            });
+            alert(res.data.message || `Ano ${clearYearModal.year} limpo com sucesso.`);
+            setClearYearModal({ ...clearYearModal, isOpen: false });
+            if (onRefresh) onRefresh();
+            if (onBack) onBack();
+        } catch (error) {
+            console.error('Error clearing year:', error);
+            const msg = error.response?.data?.error || error.message || 'Erro desconhecido';
+            alert(`Erro ao limpar ano: ${msg}`);
+        } finally {
+            setClearingYear(false);
         }
     };
 
@@ -330,9 +364,10 @@ export default function SettingsView({ onBack, onRefresh }) {
                 <SettingsColumn title="Administração" count="" icon={<AlertTriangle size={20} color="#D32F2F" />} iconBg="#FFEBEE" action={null}>
                     <div className="settings-scroll">
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                            {/* Limpar Mês */}
                             <div style={{ padding: '15px', background: '#FFEBEE', borderRadius: '8px', border: '1px solid #FFCDD2' }}>
                                 <h4 style={{ margin: '0 0 8px 0', color: '#B71C1C', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Calendar size={16} /> Limpeza de Calendário
+                                    <Calendar size={16} /> Limpeza de Calendário - Mês
                                 </h4>
                                 <p style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: '#C62828' }}>
                                     Apagar todas as aulas de um mês específico. Ação irreversível.
@@ -342,6 +377,22 @@ export default function SettingsView({ onBack, onRefresh }) {
                                     style={{ width: '100%', padding: '8px', background: 'white', border: '1px solid #EF9A9A', borderRadius: '6px', color: '#D32F2F', cursor: 'pointer', fontWeight: 500 }}
                                 >
                                     Limpar Mês
+                                </button>
+                            </div>
+
+                            {/* Limpar Ano */}
+                            <div style={{ padding: '15px', background: '#FFEBEE', borderRadius: '8px', border: '2px solid #EF5350' }}>
+                                <h4 style={{ margin: '0 0 8px 0', color: '#B71C1C', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <AlertTriangle size={16} /> Limpeza de Calendário - Ano Inteiro
+                                </h4>
+                                <p style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: '#C62828' }}>
+                                    Apagar <strong>TODAS</strong> as aulas de um ano inteiro. Esta ação é irreversível e remove todos os agendamentos do ano selecionado.
+                                </p>
+                                <button
+                                    onClick={handleOpenClearYear}
+                                    style={{ width: '100%', padding: '10px', background: '#D32F2F', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }}
+                                >
+                                    ⚠️ Limpar Ano Inteiro
                                 </button>
                             </div>
                         </div>
@@ -459,6 +510,60 @@ export default function SettingsView({ onBack, onRefresh }) {
                 type="delete"
                 confirmText={clearing ? "Limpando..." : "Confirmar Limpeza"}
                 onConfirm={handleClearMonth}
+            />
+
+            {/* YEAR SELECTION MODAL */}
+            <Modal
+                isOpen={yearSelectionModal.isOpen}
+                onClose={() => setYearSelectionModal({ ...yearSelectionModal, isOpen: false })}
+                title="Selecionar Ano para Exclusão"
+                maxWidth="380px"
+            >
+                <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ padding: '12px', background: '#FFF3E0', borderRadius: '8px', border: '1px solid #FFE0B2' }}>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#E65100', fontWeight: 500 }}>
+                            ⚠️ Esta ação excluirá TODAS as aulas do ano selecionado permanentemente.
+                        </p>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>Ano</label>
+                        <select
+                            style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #DDD', fontSize: '1rem' }}
+                            value={yearSelectionModal.year}
+                            onChange={(e) => setYearSelectionModal({ ...yearSelectionModal, year: parseInt(e.target.value) })}
+                        >
+                            {[new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1, new Date().getFullYear() + 2].map(y => (
+                                <option key={y} value={y}>{y}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                        <button
+                            className="btn-outline"
+                            onClick={() => setYearSelectionModal({ ...yearSelectionModal, isOpen: false })}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className="btn-primary"
+                            onClick={handleProceedClearYear}
+                            style={{ background: '#D32F2F', borderColor: '#D32F2F' }}
+                        >
+                            Continuar
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* YEAR CONFIRM MODAL */}
+            <ConfirmModal
+                isOpen={clearYearModal.isOpen}
+                onClose={() => setClearYearModal({ ...clearYearModal, isOpen: false })}
+                title="⚠️ Limpar Ano Inteiro"
+                message={`ATENÇÃO MÁXIMA: Você está prestes a excluir TODAS as aulas do ano ${clearYearModal.year}. Isso inclui TODOS os meses e TODAS as aulas agendadas. Esta ação NÃO pode ser desfeita. Tem certeza absoluta?`}
+                type="delete"
+                confirmText={clearingYear ? "Excluindo..." : "Confirmar Exclusão do Ano"}
+                onConfirm={handleClearYear}
             />
 
             <style>{`

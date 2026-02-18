@@ -185,6 +185,30 @@ app.delete('/api/admin/clear-month', authMiddleware, (req, res) => {
     }
 });
 
+// Admin: Endpoint para Limpar Ano Inteiro
+app.delete('/api/admin/clear-year', authMiddleware, async (req, res) => {
+    try {
+        const { year } = req.body;
+
+        if (!year) {
+            return res.status(400).json({ error: 'Ano é obrigatório' });
+        }
+
+        const result = await db.query(
+            "DELETE FROM lessons WHERE EXTRACT(YEAR FROM date) = $1",
+            [parseInt(year)]
+        );
+
+        res.json({
+            message: `Todas as aulas de ${year} foram excluídas com sucesso`,
+            deletedCount: result.rowCount
+        });
+    } catch (error) {
+        console.error('Erro ao limpar ano:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Inicialização do Servidor (Resiliente)
 const startServer = async () => {
     console.log('🚀 Iniciando servidor...');
