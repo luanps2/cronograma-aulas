@@ -35,16 +35,17 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
             setDataReady(false);
             if (isEditing && lesson) {
                 setFormData({
-                    courseId: String(lesson.courseId || ''),
-                    ucId: String(lesson.ucId || ''),
+                    // FIX: Check for both CamelCase and snake_case (postgres default)
+                    courseId: String(lesson.courseId || lesson.courseid || ''),
+                    ucId: String(lesson.ucId || lesson.ucid || ''),
                     turma: lesson.turma || '',
                     lab: lesson.lab || '',
                     period: lesson.period || '',
                     description: lesson.description || '',
                     date: lesson.date
                         ? (typeof lesson.date === 'string' ? lesson.date.split('T')[0] : `${lesson.date.getFullYear()}-${String(lesson.date.getMonth() + 1).padStart(2, '0')}-${String(lesson.date.getDate()).padStart(2, '0')}`)
-                        : (selectedDate
-                            ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+                        : (initialDate
+                            ? `${initialDate.getFullYear()}-${String(initialDate.getMonth() + 1).padStart(2, '0')}-${String(initialDate.getDate()).padStart(2, '0')}`
                             : new Date().toISOString().split('T')[0])
                 });
             } else {
@@ -55,7 +56,9 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                     lab: '',
                     period: '',
                     description: '',
-                    date: initialDate || new Date()
+                    date: initialDate
+                        ? `${initialDate.getFullYear()}-${String(initialDate.getMonth() + 1).padStart(2, '0')}-${String(initialDate.getDate()).padStart(2, '0')}`
+                        : new Date().toISOString().split('T')[0]
                 });
             }
             fetchOptions();
@@ -95,7 +98,8 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
 
         const courseIdStr = String(formData.courseId);
         const filtered = allClasses.filter(cls => {
-            const cId = String(cls.courseId || cls.course?.id || cls.course?._id || '');
+            // FIX: Check for both courseId and courseid (postgres)
+            const cId = String(cls.courseId || cls.courseid || cls.course?.id || cls.course?._id || '');
             return cId === courseIdStr;
         });
         setVisibleClasses(filtered);
@@ -112,7 +116,8 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
 
         const courseIdStr = String(formData.courseId);
         const filtered = allUcs.filter(uc => {
-            const cId = String(uc.courseId || uc.course?.id || uc.course?._id || '');
+            // FIX: Check for both courseId and courseid (postgres)
+            const cId = String(uc.courseId || uc.courseid || uc.course?.id || uc.course?._id || '');
             return cId === courseIdStr;
         });
         setVisibleUcs(filtered);

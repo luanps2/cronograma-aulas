@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE_URL from './config/api';
 import LoginPage from './components/LoginPage';
 import Layout from './components/Layout';
 import SettingsView from './components/SettingsView';
@@ -38,6 +39,11 @@ function App() {
         setIsAuthenticated(authState.isAuthenticated);
         setUser(authState.user);
         setIsAuthLoading(false);
+
+        // RENDER PRE-WARM: Wake up the server silently
+        // Hits the public health check endpoint to start the cold boot process
+        // independent of authentication status.
+        fetch(`${API_BASE_URL}/`).catch(() => { });
     }, []);
 
     const handleLogout = () => {

@@ -652,7 +652,7 @@ function LessonCard({ lesson, horizontal, onClick, onDragStart, onDragEnd, onLon
                 }}>
                 <div style={{ width: '60px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-primary)' }}>{lesson.period}</div>
                 <div style={{ width: '80px', fontWeight: 'bold', fontSize: '0.95rem', color: 'var(--text-primary)' }}>{lesson.turma}</div>
-                <div style={{ flex: 1, minWidth: '150px', fontWeight: '500', color: 'var(--text-secondary)' }}>{lesson.uc || lesson.ucName}</div>
+                <div style={{ flex: 1, minWidth: '150px', fontWeight: '500', color: 'var(--text-secondary)' }}>{lesson.uc || lesson.ucName || lesson.ucname}</div>
                 <div style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{lesson.lab}</div>
                 {lesson.description && (
                     <div style={{
@@ -719,7 +719,7 @@ function LessonCard({ lesson, horizontal, onClick, onDragStart, onDragEnd, onLon
             <div style={{ fontWeight: '700', fontSize: '0.85rem', lineHeight: '1.2' }}>{lesson.turma}</div>
 
             {/* UC */}
-            <div style={{ fontSize: '0.75rem', lineHeight: '1.2', margin: '2px 0', fontWeight: '500' }}>{lesson.uc || lesson.ucName}</div>
+            <div style={{ fontSize: '0.75rem', lineHeight: '1.2', margin: '2px 0', fontWeight: '500' }}>{lesson.uc || lesson.ucName || lesson.ucname}</div>
 
             {/* Description */}
             {lesson.description && (

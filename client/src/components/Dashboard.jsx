@@ -268,7 +268,7 @@ export default function Dashboard() {
                                 </div>
                                 <div>
                                     <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                                        {lesson.ucName} - {lesson.turma}
+                                        {lesson.ucName || lesson.ucname} - {lesson.turma}
                                     </div>
                                     <div style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>
                                         DATA: {(() => { const p = String(lesson.date).split('T')[0].split('-'); return `${p[2]}/${p[1]}/${p[0]}`; })()} • ID: {lesson.id}
