@@ -70,8 +70,9 @@ router.post('/upload-excel', authMiddleware, upload.single('image'), async (req,
 
         let client = null;
         try {
-            // A. Obter Conexão Exclusiva
-            client = await db.pool.connect();
+            // A. Obter Conexão Exclusiva (db.pool é async getPool())
+            const poolInstance = await db.pool();
+            client = await poolInstance.connect();
             await client.query('BEGIN');
 
             // --- LÓGICA DE AUTO-CRIAÇÃO (IDEMPOTENTE) ---

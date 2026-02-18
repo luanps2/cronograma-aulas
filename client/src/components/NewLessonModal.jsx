@@ -41,7 +41,11 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                     lab: lesson.lab || '',
                     period: lesson.period || '',
                     description: lesson.description || '',
-                    date: lesson.date ? new Date(lesson.date) : new Date()
+                    date: lesson.date
+                        ? (typeof lesson.date === 'string' ? lesson.date.split('T')[0] : `${lesson.date.getFullYear()}-${String(lesson.date.getMonth() + 1).padStart(2, '0')}-${String(lesson.date.getDate()).padStart(2, '0')}`)
+                        : (selectedDate
+                            ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+                            : new Date().toISOString().split('T')[0])
                 });
             } else {
                 setFormData({
@@ -148,7 +152,10 @@ export default function NewLessonModal({ isOpen, onClose, onSave, initialDate, l
                 lab: formData.lab,
                 period: formData.period,
                 description: formData.description,
-                date: formData.date instanceof Date ? formData.date.toISOString() : new Date(formData.date).toISOString()
+                // TIMEZONE FIX: Send date as YYYY-MM-DD string, never toISOString()
+                date: typeof formData.date === 'string'
+                    ? formData.date.split('T')[0]
+                    : `${formData.date.getFullYear()}-${String(formData.date.getMonth() + 1).padStart(2, '0')}-${String(formData.date.getDate()).padStart(2, '0')}`
             };
 
             if (isEditing && lesson?.id) {

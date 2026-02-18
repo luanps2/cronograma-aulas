@@ -78,7 +78,16 @@ app.use('/api/dashboard', authMiddleware, require('./routes/dashboard'));
 app.get('/api/lessons', authMiddleware, async (req, res) => {
     try {
         const result = await db.query('SELECT * FROM lessons');
-        res.json(result.rows);
+        // TIMEZONE FIX: Normalize dates to YYYY-MM-DD strings
+        // node-pg returns DATE columns as JS Date objects at UTC midnight,
+        // which causes timezone shift when serialized to JSON
+        const normalized = result.rows.map(row => ({
+            ...row,
+            date: row.date instanceof Date
+                ? `${row.date.getUTCFullYear()}-${String(row.date.getUTCMonth() + 1).padStart(2, '0')}-${String(row.date.getUTCDate()).padStart(2, '0')}`
+                : (typeof row.date === 'string' ? row.date.split('T')[0] : row.date)
+        }));
+        res.json(normalized);
     } catch (error) {
         console.error('Erro ao buscar aulas:', error);
         res.status(500).json({ error: 'Erro ao buscar aulas' });

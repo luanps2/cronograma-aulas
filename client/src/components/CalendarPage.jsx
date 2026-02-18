@@ -75,7 +75,10 @@ export default function CalendarPage({ user, onLogout }) {
             return;
         }
         setSelectedLesson(lesson);
-        setSelectedDateForModal(new Date(lesson.date));
+        // TIMEZONE FIX: extract YYYY-MM-DD string, parse locally
+        const dateStr = typeof lesson.date === 'string' ? lesson.date.split('T')[0] : `${lesson.date.getFullYear()}-${String(lesson.date.getMonth() + 1).padStart(2, '0')}-${String(lesson.date.getDate()).padStart(2, '0')}`;
+        const [y, m, d] = dateStr.split('-').map(Number);
+        setSelectedDateForModal(new Date(y, m - 1, d));
         setIsNewLessonModalOpen(true);
     }
 
@@ -135,7 +138,8 @@ export default function CalendarPage({ user, onLogout }) {
                 lab: lesson.lab,
                 period: lesson.period,
                 description: lesson.description || '',
-                date: targetDate.toISOString()
+                // TIMEZONE FIX: Send date as YYYY-MM-DD string, never toISOString()
+                date: `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`
             };
 
             await axios.put(`${API_BASE_URL}/api/lessons/${lesson.id}`, payload);
@@ -172,17 +176,16 @@ export default function CalendarPage({ user, onLogout }) {
         try {
             const response = await axios.get(`${API_BASE_URL}/api/lessons`);
             const formattedLessons = response.data
-                .filter(l => l.date && !isNaN(new Date(l.date).getTime()))
+                .filter(l => l.date)
                 .map(lesson => {
-                    let dateObj;
-                    if (typeof lesson.date === 'string' && lesson.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                        const [year, month, day] = lesson.date.split('-').map(Number);
-                        dateObj = new Date(year, month - 1, day);
-                    } else {
-                        dateObj = new Date(lesson.date);
-                    }
+                    // TIMEZONE FIX: Always parse YYYY-MM-DD as local date
+                    const dateStr = typeof lesson.date === 'string' ? lesson.date.split('T')[0] : lesson.date;
+                    const parts = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    if (!parts) return null;
+                    const dateObj = new Date(parseInt(parts[1]), parseInt(parts[2]) - 1, parseInt(parts[3]));
                     return { ...lesson, date: dateObj };
-                });
+                })
+                .filter(Boolean);
             setLessons(formattedLessons);
         } catch (error) {
             console.error('Error fetching lessons:', error);

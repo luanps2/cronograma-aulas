@@ -271,7 +271,7 @@ export default function Dashboard() {
                                         {lesson.ucName} - {lesson.turma}
                                     </div>
                                     <div style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>
-                                        DATA: {new Date(lesson.date).toLocaleDateString('pt-BR')} • ID: {lesson.id}
+                                        DATA: {(() => { const p = String(lesson.date).split('T')[0].split('-'); return `${p[2]}/${p[1]}/${p[0]}`; })()} • ID: {lesson.id}
                                     </div>
                                 </div>
                             </div>

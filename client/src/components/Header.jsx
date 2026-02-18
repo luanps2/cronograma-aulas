@@ -45,13 +45,12 @@ export default function Header({ user, onLogout, onNavigateHome }) {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/lessons`);
             const allLessons = res.data || [];
-            // Filter client-side: only today's lessons
-            const todayStr = new Date().toISOString().split('T')[0];
+            // TIMEZONE FIX: Compare YYYY-MM-DD strings directly, no UTC conversion
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const todayLessons = allLessons.filter(lesson => {
                 if (!lesson.date) return false;
-                const lessonDate = typeof lesson.date === 'string'
-                    ? lesson.date.split('T')[0]
-                    : new Date(lesson.date).toISOString().split('T')[0];
+                const lessonDate = String(lesson.date).split('T')[0];
                 return lessonDate === todayStr;
             });
             setNotifications(todayLessons);
