@@ -176,4 +176,16 @@ npm run dev
 - **UI/UX**: Prioridade para feedback visual imediato (loading states, modais, toasts).
 
 ---
-*Documentação gerada em Fev/2026 - Versão 1.0*
+
+## 8. Documentação Adicional
+
+A documentação detalhada do projeto foi organizada na pasta [`docs/`](./docs). Lá você encontrará guias sobre:
+
+- **[Deploy e CI/CD](./docs/DEPLOY.md)**: Guia completo de publicação.
+- **[Início Rápido](./docs/INICIO_RAPIDO.md)**: Para novos desenvolvedores.
+- **[Banco de Dados](./docs/banco-de-dados.md)**: Estrutura e correções.
+- **[Validação Pós-Deploy](./docs/VALIDACAO_POS_DEPLOY.md)**: Checklist de verificação.
+- **[Google/Microsoft OAuth](./docs/GOOGLE_OAUTH_SETUP.md)**: Configuração de autenticação.
+
+---
+*Documentação gerada em Fev/2026 - Versão 1.1*
