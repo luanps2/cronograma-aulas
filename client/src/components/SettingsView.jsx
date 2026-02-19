@@ -201,6 +201,35 @@ export default function SettingsView({ onBack, onRefresh }) {
         }
     };
 
+    const [normalizing, setNormalizing] = useState(false);
+
+    const handleNormalizeClasses = async () => {
+        if (!confirm('ATENÇÃO: Isso irá padronizar os nomes das turmas (ex: "TI-27" e "TI - 27" virarão "TI-27") e unir duplicatas. Deseja continuar?')) return;
+
+        setNormalizing(true);
+        try {
+            const res = await axios.post(`${API_BASE_URL}/api/settings/normalize-classes`);
+            const { report } = res.data;
+
+            let msg = `Normalização concluída!\n\n`;
+            msg += `• Aulas atualizadas: ${report.lessonsUpdated}\n`;
+            msg += `• Turmas unificadas: ${report.classesUnified}\n`;
+            msg += `• Turmas removidas: ${report.classesRemoved}\n`;
+
+            if (report.details.length > 0) {
+                msg += `\nDetalhes:\n${report.details.join('\n')}`;
+            }
+
+            alert(msg);
+            fetchAll();
+        } catch (error) {
+            console.error('Error normalizing classes:', error);
+            alert('Erro ao normalizar turmas: ' + (error.response?.data?.error || error.message));
+        } finally {
+            setNormalizing(false);
+        }
+    };
+
     if (loading) return <div style={{ padding: 40, textAlign: 'center' }}><Loader2 className="animate-spin" /> Carregando configurações...</div>;
 
     return (
@@ -310,7 +339,20 @@ export default function SettingsView({ onBack, onRefresh }) {
                     count={`${classes.length} turmas`}
                     icon={<Users size={20} color="#F57C00" />}
                     iconBg="#FFF3E0"
-                    action={<button className="btn-icon-add" onClick={() => handleOpenModal('class')}><Plus size={18} /></button>}
+                    action={
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                                className="btn-icon-add"
+                                onClick={handleNormalizeClasses}
+                                title="Normalizar Turmas"
+                                disabled={normalizing}
+                                style={{ background: '#E8F5E9', color: '#2E7D32' }}
+                            >
+                                {normalizing ? <Loader2 size={18} className="animate-spin" /> : <Edit2 size={18} />}
+                            </button>
+                            <button className="btn-icon-add" onClick={() => handleOpenModal('class')}><Plus size={18} /></button>
+                        </div>
+                    }
                 >
                     <div className="settings-scroll">
                         {classes.map(cls => (

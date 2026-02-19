@@ -1,5 +1,7 @@
 const ExcelJS = require('exceljs');
 
+const { normalizeClassName } = require('../utils/normalizers');
+
 /**
  * Normaliza o texto para o formato padrão.
  * - TI27, TI-27, TI 27 -> TI-27
@@ -8,27 +10,19 @@ const ExcelJS = require('exceljs');
  */
 function normalizeText(text, type) {
     if (!text) return null;
-    let upper = text.toString().toUpperCase().trim();
-
-    // Remover acentos
-    upper = upper.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     if (type === 'TURMA') {
-        // Expectativa do Professor/Usuário: TI-27
-        // Remove espaços, depois insere hífen se faltar
-        let clean = upper.replace(/\s+/g, '').replace(/-/g, '');
-        if (clean.startsWith('TI')) {
-            const num = clean.replace('TI', '');
-            return `TI-${num}`;
-        }
-        return upper; // Fallback
+        return normalizeClassName(text);
     }
+
+    let upper = text.toString().toUpperCase().trim();
+    // Remover acentos
+    upper = upper.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     if (type === 'UC') {
         // Expectativa do Professor/Usuário: UC12
         let clean = upper.replace(/\s+/g, '').replace(/-/g, '');
         if (clean.startsWith('UC')) {
-            // Lidar com algarismos romanos se necessário, mas por prompt "UC12" é padrão
             return clean;
         }
         // Lidar com erro de digitação "UE12"
@@ -44,7 +38,7 @@ function normalizeText(text, type) {
         if (clean.startsWith('LAB')) {
             return clean;
         }
-        // Lidar com "LABORATORIO 43"
+        // Lidar com "LABORATORIO 43" - manter logica existente
         if (clean.includes('LAB')) {
             const num = clean.match(/\d+/);
             if (num) return `LAB${num[0]}`;

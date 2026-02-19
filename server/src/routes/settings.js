@@ -1,6 +1,92 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { normalizeClassName } = require('../utils/normalizers');
+
+// NORMALIZATION ENDPOINT
+router.post('/normalize-classes', async (req, res) => {
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const report = {
+            lessonsUpdated: 0,
+            classesUnified: 0,
+            classesRemoved: 0,
+            details: []
+        };
+
+        // 1. NORMALIZE LESSONS (turma column is string)
+        const lessons = await client.query('SELECT DISTINCT turma FROM lessons');
+        for (const row of lessons.rows) {
+            const original = row.turma;
+            const normalized = normalizeClassName(original);
+
+            if (original !== normalized) {
+                // Update all lessons with this old name
+                const updateRes = await client.query(
+                    'UPDATE lessons SET turma = $1 WHERE turma = $2',
+                    [normalized, original]
+                );
+                report.lessonsUpdated += updateRes.rowCount;
+                if (updateRes.rowCount > 0) {
+                    report.details.push(`Aulas: "${original}" -> "${normalized}" (${updateRes.rowCount} aulas)`);
+                }
+            }
+        }
+
+        // 2. NORMALIZE CLASSES TABLE (Deduplicate)
+        const classes = await client.query('SELECT * FROM classes');
+        const groups = {};
+
+        // Group by normalized name
+        classes.rows.forEach(cls => {
+            const norm = normalizeClassName(cls.name);
+            const key = `${cls.courseid}_${norm}`; // Uniqueness per course
+            if (!groups[key]) groups[key] = [];
+            groups[key].push({ ...cls, normalizedName: norm });
+        });
+
+        // Process groups
+        for (const key in groups) {
+            const group = groups[key];
+
+            // If we have duplicates or if the single item needs rename
+            if (group.length > 0) {
+                // Pick master (lowest ID usually created first, or just pick first)
+                // If existing normalized name is favored? 
+                // Let's just pick the first one as master.
+                const master = group[0];
+
+                // Update master name if needed
+                if (master.name !== master.normalizedName) {
+                    await client.query('UPDATE classes SET name = $1 WHERE id = $2', [master.normalizedName, master.id]);
+                }
+
+                // If duplicates exist, remove them
+                if (group.length > 1) {
+                    const slaves = group.slice(1);
+                    const slaveIds = slaves.map(s => s.id);
+
+                    // Delete slaves
+                    await client.query('DELETE FROM classes WHERE id = ANY($1)', [slaveIds]);
+
+                    report.classesUnified += 1; // One group unified
+                    report.classesRemoved += slaves.length;
+                    report.details.push(`Turmas Unificadas: Mantida "${master.normalizedName}" (ID ${master.id}), removidas IDs ${slaveIds.join(', ')}`);
+                }
+            }
+        }
+
+        await client.query('COMMIT');
+        res.json({ message: 'Normalização concluída com sucesso.', report });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Erro na normalização:', error);
+        res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
+    }
+});
 
 // GET ALL
 router.get('/:type', async (req, res) => {

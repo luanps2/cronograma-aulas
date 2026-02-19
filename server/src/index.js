@@ -75,6 +75,8 @@ app.use('/api/links', authMiddleware, linksRoutes);
 app.use('/api/events', authMiddleware, require('./routes/events')); // NEW: Events Route
 app.use('/api/dashboard', authMiddleware, require('./routes/dashboard'));
 
+const { normalizeClassName } = require('./utils/normalizers'); // Added import
+
 // Rotas
 app.get('/api/lessons', authMiddleware, async (req, res) => {
     try {
@@ -103,6 +105,8 @@ app.post('/api/lessons', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Curso e UC são obrigatórios.' });
         }
 
+        const normalizedTurma = normalizeClassName(turma); // Normalization here
+
         // Validação de Hierarquia: A UC pertence a este Curso?
         const uc = (await db.query('SELECT name FROM ucs WHERE id = $1 AND courseId = $2', [ucId, courseId])).rows[0];
         if (!uc) {
@@ -111,10 +115,10 @@ app.post('/api/lessons', authMiddleware, async (req, res) => {
 
         const result = await db.query(
             'INSERT INTO lessons (courseId, turma, ucId, ucName, period, lab, date, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-            [courseId, turma, ucId, uc.name, period, lab, date, description]
+            [courseId, normalizedTurma, ucId, uc.name, period, lab, date, description]
         );
 
-        res.status(201).json({ id: result.rows[0].id, ...req.body, ucName: uc.name });
+        res.status(201).json({ id: result.rows[0].id, ...req.body, turma: normalizedTurma, ucName: uc.name });
     } catch (error) {
         console.error('Erro ao criar aula:', error);
         res.status(400).json({ error: error.message });
@@ -130,6 +134,8 @@ app.put('/api/lessons/:id', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Curso e UC são obrigatórios.' });
         }
 
+        const normalizedTurma = normalizeClassName(turma); // Normalization here
+
         const uc = (await db.query('SELECT name FROM ucs WHERE id = $1 AND courseId = $2', [ucId, courseId])).rows[0];
         if (!uc) {
             return res.status(400).json({ error: 'Inconsistência: A UC selecionada não pertence ao Curso selecionado.' });
@@ -137,10 +143,10 @@ app.put('/api/lessons/:id', authMiddleware, async (req, res) => {
 
         await db.query(
             'UPDATE lessons SET courseId = $1, turma = $2, ucId = $3, ucName = $4, period = $5, lab = $6, date = $7, description = $8 WHERE id = $9',
-            [courseId, turma, ucId, uc.name, period, lab, date, description, id]
+            [courseId, normalizedTurma, ucId, uc.name, period, lab, date, description, id]
         );
 
-        res.json({ id, ...req.body, ucName: uc.name });
+        res.json({ id, ...req.body, turma: normalizedTurma, ucName: uc.name });
     } catch (error) {
         console.error('Erro ao atualizar aula:', error);
         res.status(400).json({ error: error.message });
